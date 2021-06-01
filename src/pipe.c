@@ -52,7 +52,7 @@ ipcError pipe_destroy(Pipe *pipe) {
 ipcError pipe_read_bytes(Pipe pipe, void *buffer, size_t bytes_to_read) {
   size_t bytes_read = 0;
 #ifdef _WIN32
-  ReadFile(pipe.handle, buffer, bytes_to_read, &bytes_read, NULL);
+  ReadFile(pipe.handle, buffer, bytes_to_read, (LPDWORD)&bytes_read, NULL);
 #else
   bytes_read = read(pipe.handle, buffer, bytes_to_read);
 #endif
@@ -62,7 +62,7 @@ ipcError pipe_read_bytes(Pipe pipe, void *buffer, size_t bytes_to_read) {
 ipcError pipe_write_bytes(Pipe pipe, void *buffer, size_t bytes_to_write) {
   size_t bytes_written = 0;
 #ifdef _WIN32
-  WriteFile(pipe.handle, buffer, bytes_to_read, &bytes_written, NULL);
+  WriteFile(pipe.handle, buffer, bytes_to_write, (LPDWORD)&bytes_written, NULL);
 #else
   bytes_written = write(pipe.handle, buffer, bytes_to_write);
 #endif

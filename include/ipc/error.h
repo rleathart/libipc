@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef _WIN32
+#include <ipc/ipc_exports.h>
+#endif
+
 typedef enum {
   ipcErrorNone,
   ipcErrorSocketOpen,
@@ -9,4 +13,4 @@ typedef enum {
   ipcErrorFileRemove,
 } ipcError;
 
-char *ipcError_str(ipcError e);
+IPC_EXPORT char *ipcError_str(ipcError e);
