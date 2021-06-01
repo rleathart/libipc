@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-include(GenerateExportHeader)
+if (WIN32)
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+  set(BUILD_SHARED_LIBS TRUE)
+endif()
 
 project(ipc C)
 
@@ -18,13 +21,6 @@ if (DOTNET_PIPES)
 endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC include)
-
-GENERATE_EXPORT_HEADER(${PROJECT_NAME}
-  BASE_NAME ${PROJECT_NAME}
-  EXPORT_MACRO_NAME IPC_EXPORT
-  EXPORT_FILE_NAME ${CMAKE_CURRENT_LIST_DIR}/include/ipc/ipc_exports.h
-  STATIC_DEFINE SHARED_EXPORTS_BUILT_AS_STATIC # Is this required?
-  )
 
 add_executable(test_pipe test/pipe.c)
 target_include_directories(test_pipe PUBLIC include)
