@@ -19,5 +19,6 @@ typedef struct {
 } Pipe;
 
 ipcError pipe_create(Pipe *pipe, char *name);
+ipcError pipe_destroy(Pipe *pipe);
 ipcError pipe_write_bytes(Pipe pipe, void *buffer, size_t bytes_to_write);
 ipcError pipe_read_bytes(Pipe pipe, void *buffer, size_t bytes_to_read);

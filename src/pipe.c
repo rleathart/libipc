@@ -1,4 +1,6 @@
 #include <ipc/pipe.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -12,11 +14,10 @@
 #include <unistd.h>
 #endif
 
-ipcError pipe_create(Pipe *pipe, char *name)
-{
+ipcError pipe_create(Pipe *pipe, char *name) {
 #ifdef _WIN32
-  pipe->handle = CreateFile(name, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE, NULL,
-                     OPEN_EXISTING, 0, NULL);
+  pipe->handle = CreateFile(name, GENERIC_READ | GENERIC_WRITE,
+                            FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
   if (!pipe->handle)
     return ipcErrorHandleNull;
 #elif defined DOTNET_PIPES
@@ -26,11 +27,25 @@ ipcError pipe_create(Pipe *pipe, char *name)
   struct sockaddr_un sock = {.sun_family = AF_LOCAL, .sun_path = {0}};
   strncpy(sock.sun_path, name, sizeof(sock.sun_path));
 
-  if (connect(pipe->handle, (struct sockaddr *)&sock, sizeof(sock)) < 0)
+  int can_bind =
+      bind(pipe->handle, (struct sockaddr *)&sock, sizeof(sock)) != 0;
+  int can_connect =
+      connect(pipe->handle, (struct sockaddr *)&sock, sizeof(sock)) != 0;
+
+  if (!can_bind && !can_connect) {
     return ipcErrorSocketConnect;
+  }
+
 #endif
 
   pipe->name = name;
+  return ipcErrorNone;
+}
+
+ipcError pipe_destroy(Pipe *pipe) {
+  if (remove(pipe->name) != 0)
+    return ipcErrorFileRemove;
+
   return ipcErrorNone;
 }
 

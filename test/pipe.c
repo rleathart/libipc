@@ -6,7 +6,15 @@
 int main(int argc, char **argv) {
   ipcError err;
   Pipe pipe;
-  err = pipe_create(&pipe, "pipe.c.test_pipe");
+
+  char *pipename = "pipe.c.test_pipe";
+  err = pipe_create(&pipe, pipename);
+  if (err) {
+    fprintf(stderr, "Error: %s\n", ipcError_str(err));
+    return EXIT_FAILURE;
+  }
+
+  err = pipe_destroy(&pipe);
   if (err) {
     fprintf(stderr, "Error: %s\n", ipcError_str(err));
     return EXIT_FAILURE;
