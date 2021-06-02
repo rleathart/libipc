@@ -36,7 +36,7 @@ Pipe pipe_create(char *name, ipcError *err) {
   struct sockaddr_un sock = {.sun_family = AF_LOCAL, .sun_path = {0}};
   strncpy(sock.sun_path, name, sizeof(sock.sun_path));
 
-  if (bind(pipe->handle, (struct sockaddr *)&sock, sizeof(sock)) != 0)
+  if (bind(handle, (struct sockaddr *)&sock, sizeof(sock)) != 0)
     *err = ipcErrorSocketCreate;
 #endif
 
@@ -63,7 +63,7 @@ Pipe pipe_connect(char *name, ipcError *err) {
   struct sockaddr_un sock = {.sun_family = AF_LOCAL, .sun_path = {0}};
   strncpy(sock.sun_path, name, sizeof(sock.sun_path));
 
-  if (conect(pipe->handle, (struct sockaddr *)&sock, sizeof(sock)) != 0)
+  if (connect(handle, (struct sockaddr *)&sock, sizeof(sock)) != 0)
     *err = ipcErrorSocketConnect;
 #endif
 
