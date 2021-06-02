@@ -18,11 +18,12 @@ typedef int PipeHandle;
 #endif
 
 typedef struct {
-  PipeHandle handle;
-  char *name;
+  PipeHandle const handle;
+  char * const name;
 } Pipe;
 
-ipcError pipe_create(Pipe *pipe, char *name);
+Pipe     pipe_create(char *name, ipcError *err);
+Pipe     pipe_connect(char *name, ipcError *err);
 ipcError pipe_destroy(Pipe *pipe);
 ipcError pipe_write_bytes(Pipe pipe, void *buffer, size_t bytes_to_write);
 ipcError pipe_read_bytes(Pipe pipe, void *buffer, size_t bytes_to_read);
