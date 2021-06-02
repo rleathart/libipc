@@ -7,6 +7,12 @@ endif()
 
 project(ipc C)
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(CHECK REQUIRED check)
+
+include_directories(include ${CHECK_INCLUDE_DIRS})
+link_directories(${CHECK_LIBRARY_DIRS})
+
 add_library(${PROJECT_NAME} SHARED
   src/pipe.c
   src/error.c
@@ -20,8 +26,5 @@ if (DOTNET_PIPES)
   add_compile_definitions(DOTNET_PIPES)
 endif()
 
-target_include_directories(${PROJECT_NAME} PUBLIC include)
-
 add_executable(test_pipe test/pipe.c)
-target_include_directories(test_pipe PUBLIC include)
-target_link_libraries(test_pipe ${PROJECT_NAME})
+target_link_libraries(test_pipe ${PROJECT_NAME} ${CHECK_LIBRARIES})
