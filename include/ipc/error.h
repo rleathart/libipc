@@ -2,10 +2,14 @@
 
 typedef enum {
   ipcErrorNone,
+  ipcErrorUnknown,
   ipcErrorSocketOpen,
   ipcErrorSocketConnect,
   ipcErrorSocketCreate,
-  ipcErrorHandleNull,
+  ipcErrorSocketClose,
+  ipcErrorSocketDoesntExist,
+  ipcErrorSocketAlreadyExists,
+  ipcErrorHandleInvalid,
   ipcErrorFileRemove,
 } ipcError;
 
