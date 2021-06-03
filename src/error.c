@@ -18,6 +18,8 @@ char *ipcError_str(ipcError e) {
     return "Invalid handle";
   case ipcErrorFileRemove:
     return "Error removing file";
+  case ipcErrorActualNeqExpected:
+    return "Actual value differs from expected";
   default:
     return "Unknown error";
   }

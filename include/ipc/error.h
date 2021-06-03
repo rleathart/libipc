@@ -11,6 +11,7 @@ typedef enum {
   ipcErrorSocketAlreadyExists,
   ipcErrorHandleInvalid,
   ipcErrorFileRemove,
+  ipcErrorActualNeqExpected,
 } ipcError;
 
 char *ipcError_str(ipcError e);
