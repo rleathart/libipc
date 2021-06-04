@@ -7,6 +7,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <process.h>
 #include <processthreadsapi.h>
 #else
 #include <unistd.h>
@@ -19,6 +20,9 @@ char *sockname = "\\\\.\\pipe\\socket.c.test_sock";
 #else
 char *sockname = "socket.c.test_sock";
 #endif
+
+// Give the test server this many ms to start before connecting client
+#define SERVER_START_GRACE_MS 50
 
 void setup() {
   socket_destroy(&test_server);
@@ -47,13 +51,58 @@ START_TEST(test_socket_destroy) {
 }
 END_TEST
 
+unsigned server_thread(void* arg) {
+  socket_create(&test_server, sockname);
+  socket_wait_for_connect(&test_server);
+  char *buffer = malloc(512);
+  strcpy(buffer, "Hello from server");
+
+  socket_write_bytes(&test_server, buffer, strlen(buffer) + 1);
+
+  socket_read_bytes(&test_server, buffer, 512);
+
+  if(strcmp(buffer, "Hello from client") != 0)
+    _endthreadex(1);
+
+  _endthreadex(0);
+
+  return 0;
+}
+
+unsigned client_thread(void* arg) {
+  if(socket_connect(&test_client, sockname))
+    _endthreadex(1);
+
+  char *buffer = malloc(512);
+
+  socket_read_bytes(&test_client, buffer, 512);
+  if(strcmp(buffer, "Hello from server") != 0)
+    _endthreadex(1);
+  strcpy(buffer, "Hello from client");
+  socket_write_bytes(&test_client, buffer, strlen(buffer) + 1);
+
+  _endthreadex(0);
+
+  return 0;
+}
+
 START_TEST(test_socket_server_client) {
 #ifdef _WIN32
-  // TODO: Find out how to do this test on windows
+  HANDLE threads[2];
+  threads[0] = (HANDLE)_beginthreadex(NULL, 0, server_thread, NULL, 0, NULL);
+  Sleep(SERVER_START_GRACE_MS); // give server time to start
+  threads[1] = (HANDLE)_beginthreadex(NULL, 0, client_thread, NULL, 0, NULL);
+  WaitForMultipleObjectsEx(2, threads, TRUE, 2000, FALSE);
+  TerminateThread(threads[0], 2);
+  TerminateThread(threads[1], 2);
+  unsigned long errcodes[2] = {0};
+  GetExitCodeThread(threads[0], &errcodes[0]);
+  GetExitCodeThread(threads[1], &errcodes[1]);
+  fail_if(errcodes[0] || errcodes[1], "Client and server could not communicate");
 #else
   struct timespec ts = {
       .tv_sec = 0,
-      .tv_nsec = 50 * 1000000 // give server 50ms to start up
+      .tv_nsec = SERVER_START_GRACE_MS * 1000000 // give server time to start
   };
 
   pid_t pid = fork();
@@ -91,6 +140,7 @@ int main(int argc, char **argv) {
 
   setup();
 
+  tcase_add_checked_fixture(tc1_1, setup, teardown);
   tcase_add_test(tc1_1, test_socket_create);
   tcase_add_test(tc1_1, test_socket_destroy);
   tcase_add_test(tc1_1, test_socket_server_client);
