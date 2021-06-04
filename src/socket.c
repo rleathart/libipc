@@ -1,8 +1,10 @@
 #include <ipc/socket.h>
 #include <string.h>
 
-#ifndef __WIN32
-
+#ifdef _WIN32
+#define strdup _strdup
+#include <windows.h>
+#else
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/socket.h>
@@ -10,16 +12,33 @@
 #include <sys/un.h>
 
 #include <unistd.h>
+#endif
 
 static ipcError _socket_create(Socket *sock, char *name, int is_server) {
-  struct sockaddr_un sock_name = {.sun_family = PF_LOCAL, .sun_path = {0}};
-  strncpy(sock_name.sun_path, name, sizeof(sock_name.sun_path));
   sock->name = strdup(name);
-
   if (is_server)
     sock->type = ipcSocketTypeServer;
   else
     sock->type = ipcSocketTypeClient;
+#ifdef _WIN32
+  if (is_server) {
+    sock->server = CreateNamedPipe(name, PIPE_ACCESS_DUPLEX,
+        PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
+        PIPE_UNLIMITED_INSTANCES, 512, 512, 0, NULL);
+  } else {
+    sock->server = CreateFile(name, GENERIC_READ | GENERIC_WRITE,
+        FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+  }
+  sock->client = sock->server;
+  if (sock->server == INVALID_HANDLE_VALUE)
+    return ipcErrorHandleInvalid;
+
+  /* DWORD lasterr = GetLastError(); */
+  /* if (lasterr == ERROR_ALREADY_EXISTS) */
+  /*   return ipcErrorSocketAlreadyExists; */
+#else
+  struct sockaddr_un sock_name = {.sun_family = PF_LOCAL, .sun_path = {0}};
+  strncpy(sock_name.sun_path, name, sizeof(sock_name.sun_path));
 
   if ((sock->server = socket(PF_LOCAL, SOCK_STREAM, 0)) < 0)
     return ipcErrorSocketOpen;
@@ -37,6 +56,7 @@ static ipcError _socket_create(Socket *sock, char *name, int is_server) {
                 SUN_LEN(&sock_name)) != 0)
       return ipcErrorSocketConnect;
   }
+#endif
 
   return ipcErrorNone;
 }
@@ -50,8 +70,13 @@ ipcError socket_connect(Socket *sock, char *name) {
 }
 
 ipcError socket_wait_for_connect(Socket *sock) {
+#ifdef _WIN32
+  if (sock->type == ipcSocketTypeServer)
+    ConnectNamedPipe(sock->server, NULL);
+#else
   if (sock->type == ipcSocketTypeServer)
     sock->client = accept(sock->server, NULL, NULL);
+#endif
   return ipcErrorNone;
 }
 
@@ -61,8 +86,11 @@ ipcError socket_write_bytes(Socket *sock, void *buffer, size_t bytes_to_write) {
     handle = sock->client;
   else
     handle = sock->server;
-
+#ifdef _WIN32
+  WriteFile(handle, buffer, bytes_to_write, NULL, NULL);
+#else
   write(handle, buffer, bytes_to_write);
+#endif
   return ipcErrorNone;
 }
 
@@ -72,22 +100,29 @@ ipcError socket_read_bytes(Socket *sock, void *buffer, size_t bytes_to_read) {
     handle = sock->client;
   else
     handle = sock->server;
-
+#ifdef _WIN32
+  ReadFile(handle, buffer, bytes_to_read, NULL, NULL);
+#else
   read(handle, buffer, bytes_to_read);
+#endif
   return ipcErrorNone;
 
 }
 
 ipcError socket_destroy(Socket *sock) {
+  ipcError err = ipcErrorNone;
+#ifdef _WIN32
+  if (!DisconnectNamedPipe(sock->server))
+    err = ipcErrorSocketClose;
+#else
   if (unlink(sock->name))
-    return ipcErrorFileRemove;
+    err = ipcErrorFileRemove;
+#endif
 
   if (sock->name)
     free(sock->name);
 
   sock->name = NULL;
 
-  return ipcErrorNone;
+  return err;
 }
-
-#endif

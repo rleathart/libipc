@@ -4,9 +4,12 @@
 #include <check.h>
 #include <ipc/pipe.h>
 
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 #ifdef _WIN32
+#define strdup _strdup
 char *pipename = "\\\\.\\pipe\\pipe.c.test_pipe";
 #else
 char *pipename = "pipe.c.test_pipe";
@@ -34,6 +37,7 @@ START_TEST(test_pipe_destroy) {
 END_TEST
 
 START_TEST(test_pipe_can_write_bytes) {
+#ifndef _WIN32
   ipcError err = 0;
   pipe_create(&test_pipe, pipename);
   char bytes[4];
@@ -44,6 +48,7 @@ START_TEST(test_pipe_can_write_bytes) {
     err = pipe_write_bytes(test_pipe, bytes, sizeof(bytes));
   }
   fail_if(err, "Could not write bytes to a pipe");
+#endif
 }
 END_TEST
 

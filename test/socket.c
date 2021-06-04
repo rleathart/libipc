@@ -5,13 +5,20 @@
 #include <check.h>
 #include <ipc/socket.h>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <windows.h>
+#include <processthreadsapi.h>
+#else
 #include <unistd.h>
 #endif
 
 Socket test_server;
 Socket test_client;
+#ifdef _WIN32
+char *sockname = "\\\\.\\pipe\\socket.c.test_sock";
+#else
 char *sockname = "socket.c.test_sock";
+#endif
 
 void setup() {
   socket_destroy(&test_server);
@@ -42,6 +49,7 @@ END_TEST
 
 START_TEST(test_socket_server_client) {
 #ifdef _WIN32
+  // TODO: Find out how to do this test on windows
 #else
   struct timespec ts = {
       .tv_sec = 0,

@@ -3,6 +3,10 @@
 #include <ipc/error.h>
 #include <stdlib.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 typedef enum {
   ipcSocketTypeServer,
   ipcSocketTypeClient,
@@ -12,7 +16,11 @@ typedef enum {
 //  - Local IPC
 //  - Bidirectional one to one transport
 
+#ifdef _WIN32
+typedef HANDLE SocketHandle;
+#else
 typedef int SocketHandle;
+#endif
 
 typedef struct {
   char *name;

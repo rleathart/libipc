@@ -30,8 +30,13 @@ endif()
 
 add_executable(test_pipe test/pipe.c)
 target_link_libraries(test_pipe ${PROJECT_NAME} ${CHECK_LIBRARIES})
+add_test(NAME pipe COMMAND test_pipe)
+
 add_executable(test_socket test/socket.c)
 target_link_libraries(test_socket ${PROJECT_NAME} ${CHECK_LIBRARIES})
-
-add_test(NAME pipe COMMAND test_pipe)
 add_test(NAME socket COMMAND test_socket)
+
+add_executable(test_client test/client.c)
+target_link_libraries(test_client ${PROJECT_NAME} ${CHECK_LIBRARIES})
+add_executable(test_server test/server.c)
+target_link_libraries(test_server ${PROJECT_NAME} ${CHECK_LIBRARIES})
