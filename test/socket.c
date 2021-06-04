@@ -51,6 +51,7 @@ START_TEST(test_socket_destroy) {
 }
 END_TEST
 
+#ifdef _WIN32
 unsigned server_thread(void* arg) {
   socket_create(&test_server, sockname);
   socket_wait_for_connect(&test_server);
@@ -85,6 +86,7 @@ unsigned client_thread(void* arg) {
 
   return 0;
 }
+#endif
 
 START_TEST(test_socket_server_client) {
 #ifdef _WIN32
