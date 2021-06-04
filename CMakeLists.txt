@@ -8,8 +8,11 @@ endif()
 project(ipc C)
 
 include(CTest)
-find_package(Check REQUIRED)
-include_directories(include)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(CHECK REQUIRED check)
+
+include_directories(include ${CHECK_INCLUDE_DIRS})
+link_directories(${CHECK_LIBRARY_DIRS})
 
 add_library(${PROJECT_NAME} SHARED
   src/pipe.c
@@ -26,9 +29,9 @@ if (DOTNET_PIPES)
 endif()
 
 add_executable(test_pipe test/pipe.c)
-target_link_libraries(test_pipe ${PROJECT_NAME} Check::checkShared)
+target_link_libraries(test_pipe ${PROJECT_NAME} ${CHECK_LIBRARIES})
 add_executable(test_socket test/socket.c)
-target_link_libraries(test_socket ${PROJECT_NAME} Check::checkShared)
+target_link_libraries(test_socket ${PROJECT_NAME} ${CHECK_LIBRARIES})
 
 add_test(NAME pipe COMMAND test_pipe)
 add_test(NAME socket COMMAND test_socket)

@@ -5,7 +5,9 @@
 #include <check.h>
 #include <ipc/socket.h>
 
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 Socket test_server;
 Socket test_client;

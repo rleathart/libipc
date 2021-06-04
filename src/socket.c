@@ -1,4 +1,5 @@
 #include <ipc/socket.h>
+#include <string.h>
 
 #ifndef __WIN32
 
