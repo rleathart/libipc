@@ -1,5 +1,6 @@
 #include <ipc/socket.h>
 #include <stdio.h>
+#include <string.h>
 int main(void)
 {
   char* sockname = "\\\\.\\pipe\\test_sock";

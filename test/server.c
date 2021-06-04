@@ -1,5 +1,6 @@
 #include <ipc/socket.h>
 #include <stdio.h>
+#include <string.h>
 
 int main(void)
 {
@@ -7,7 +8,6 @@ int main(void)
   Socket* server = malloc(sizeof(Socket));
 
   socket_create(server, sockname);
-  printf("%p\n", server->server);
 
   socket_wait_for_connect(server);
   char* buffer = malloc(512);
