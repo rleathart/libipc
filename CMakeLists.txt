@@ -15,7 +15,6 @@ include_directories(include ${CHECK_INCLUDE_DIRS})
 link_directories(${CHECK_LIBRARY_DIRS})
 
 add_library(${PROJECT_NAME} SHARED
-  src/pipe.c
   src/socket.c
   src/error.c
   )
@@ -23,14 +22,6 @@ add_library(${PROJECT_NAME} SHARED
 if (WIN32)
   add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 endif()
-
-if (DOTNET_PIPES)
-  add_compile_definitions(DOTNET_PIPES)
-endif()
-
-add_executable(test_pipe test/pipe.c)
-target_link_libraries(test_pipe ${PROJECT_NAME} ${CHECK_LIBRARIES})
-add_test(NAME pipe COMMAND test_pipe)
 
 add_executable(test_socket test/socket.c)
 target_link_libraries(test_socket ${PROJECT_NAME} ${CHECK_LIBRARIES})

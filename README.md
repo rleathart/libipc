@@ -2,7 +2,7 @@
 
 Compile with
 ```
-cmake -B build -G Ninja -DDOTNET_PIPES=1
+cmake -B build -G Ninja
 cmake --build build
 ```
 
