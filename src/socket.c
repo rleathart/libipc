@@ -22,20 +22,21 @@ static ipcError _socket_create(Socket *sock, char *name, int is_server) {
     sock->type = ipcSocketTypeClient;
 #ifdef _WIN32
   if (is_server) {
-    sock->server = CreateNamedPipe(name, PIPE_ACCESS_DUPLEX,
-        PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
-        PIPE_UNLIMITED_INSTANCES, 512, 512, 0, NULL);
+    sock->server =
+        CreateNamedPipe(name, PIPE_ACCESS_DUPLEX,
+                        PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
+                        PIPE_UNLIMITED_INSTANCES, 512, 512, 0, NULL);
   } else {
+    // UNIX connect() blocks until connection so windows should too
+    while (WaitNamedPipe(name, INFINITE) == 0)
+      ;
     sock->server = CreateFile(name, GENERIC_READ | GENERIC_WRITE,
-        FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+                              FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
   }
   sock->client = sock->server;
   if (sock->server == INVALID_HANDLE_VALUE)
     return ipcErrorHandleInvalid;
 
-  /* DWORD lasterr = GetLastError(); */
-  /* if (lasterr == ERROR_ALREADY_EXISTS) */
-  /*   return ipcErrorSocketAlreadyExists; */
 #else
   struct sockaddr_un sock_name = {.sun_family = PF_LOCAL, .sun_path = {0}};
   strncpy(sock_name.sun_path, name, sizeof(sock_name.sun_path));
@@ -106,7 +107,6 @@ ipcError socket_read_bytes(Socket *sock, void *buffer, size_t bytes_to_read) {
   read(handle, buffer, bytes_to_read);
 #endif
   return ipcErrorNone;
-
 }
 
 ipcError socket_destroy(Socket *sock) {

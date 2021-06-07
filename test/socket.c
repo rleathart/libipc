@@ -6,9 +6,8 @@
 #include <ipc/socket.h>
 
 #ifdef _WIN32
-#include <windows.h>
 #include <process.h>
-#include <processthreadsapi.h>
+#include <windows.h>
 #else
 #include <unistd.h>
 #endif
@@ -20,9 +19,6 @@ char *sockname = "\\\\.\\pipe\\socket.c.test_sock";
 #else
 char *sockname = "socket.c.test_sock";
 #endif
-
-// Give the test server this many ms to start before connecting client
-#define SERVER_START_GRACE_MS 50
 
 void setup() {
   socket_destroy(&test_server);
@@ -52,7 +48,7 @@ START_TEST(test_socket_destroy) {
 END_TEST
 
 #ifdef _WIN32
-unsigned server_thread(void* arg) {
+unsigned server_thread(void *arg) {
   socket_create(&test_server, sockname);
   socket_wait_for_connect(&test_server);
   char *buffer = malloc(512);
@@ -62,7 +58,7 @@ unsigned server_thread(void* arg) {
 
   socket_read_bytes(&test_server, buffer, 512);
 
-  if(strcmp(buffer, "Hello from client") != 0)
+  if (strcmp(buffer, "Hello from client") != 0)
     _endthreadex(1);
 
   _endthreadex(0);
@@ -70,14 +66,14 @@ unsigned server_thread(void* arg) {
   return 0;
 }
 
-unsigned client_thread(void* arg) {
-  if(socket_connect(&test_client, sockname))
+unsigned client_thread(void *arg) {
+  if (socket_connect(&test_client, sockname))
     _endthreadex(1);
 
   char *buffer = malloc(512);
 
   socket_read_bytes(&test_client, buffer, 512);
-  if(strcmp(buffer, "Hello from server") != 0)
+  if (strcmp(buffer, "Hello from server") != 0)
     _endthreadex(1);
   strcpy(buffer, "Hello from client");
   socket_write_bytes(&test_client, buffer, strlen(buffer) + 1);
@@ -92,7 +88,6 @@ START_TEST(test_socket_server_client) {
 #ifdef _WIN32
   HANDLE threads[2];
   threads[0] = (HANDLE)_beginthreadex(NULL, 0, server_thread, NULL, 0, NULL);
-  Sleep(SERVER_START_GRACE_MS); // give server time to start
   threads[1] = (HANDLE)_beginthreadex(NULL, 0, client_thread, NULL, 0, NULL);
   WaitForMultipleObjectsEx(2, threads, TRUE, 2000, FALSE);
   TerminateThread(threads[0], 2);
@@ -100,13 +95,9 @@ START_TEST(test_socket_server_client) {
   unsigned long errcodes[2] = {0};
   GetExitCodeThread(threads[0], &errcodes[0]);
   GetExitCodeThread(threads[1], &errcodes[1]);
-  fail_if(errcodes[0] || errcodes[1], "Client and server could not communicate");
+  fail_if(errcodes[0] || errcodes[1],
+          "Client and server could not communicate");
 #else
-  struct timespec ts = {
-      .tv_sec = 0,
-      .tv_nsec = SERVER_START_GRACE_MS * 1000000 // give server time to start
-  };
-
   pid_t pid = fork();
   if (pid == 0) {
     socket_create(&test_server, sockname);
@@ -120,7 +111,6 @@ START_TEST(test_socket_server_client) {
 
     fail_if(strcmp(buffer, "Hello from client") != 0);
   } else {
-    nanosleep(&ts, &ts);
     fail_if(socket_connect(&test_client, sockname));
 
     char *buffer = malloc(512);
