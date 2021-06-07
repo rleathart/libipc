@@ -27,7 +27,6 @@ static ipcError _socket_create(Socket *sock, char *name, int is_server) {
                         PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
                         PIPE_UNLIMITED_INSTANCES, 512, 512, 0, NULL);
   } else {
-    // UNIX connect() blocks until connection so windows should too
     while (WaitNamedPipe(name, INFINITE) == 0)
       ;
     sock->server = CreateFile(name, GENERIC_READ | GENERIC_WRITE,
@@ -53,9 +52,9 @@ static ipcError _socket_create(Socket *sock, char *name, int is_server) {
   } else {
     if ((sock->client = socket(PF_LOCAL, SOCK_STREAM, 0)) < 0)
       return ipcErrorSocketOpen;
-    if (connect(sock->server, (struct sockaddr *)&sock_name,
+    while (connect(sock->server, (struct sockaddr *)&sock_name,
                 SUN_LEN(&sock_name)) != 0)
-      return ipcErrorSocketConnect;
+      ;
   }
 #endif
 
