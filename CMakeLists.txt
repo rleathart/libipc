@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 if (WIN32)
-  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
-  set(BUILD_SHARED_LIBS TRUE)
+  add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 endif()
 
 project(ipc C)
+
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS YES CACHE BOOL "Export all symbols")
 
 include(CTest)
 find_package(PkgConfig REQUIRED)
@@ -14,14 +15,23 @@ pkg_check_modules(CHECK REQUIRED check)
 include_directories(include ${CHECK_INCLUDE_DIRS})
 link_directories(${CHECK_LIBRARY_DIRS})
 
-add_library(${PROJECT_NAME} SHARED
+add_library(${PROJECT_NAME}
   src/socket.c
   src/error.c
   )
-
-if (WIN32)
-  add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
-endif()
+target_include_directories(${PROJECT_NAME} PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+    PRIVATE src)
+install(
+  TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}Config
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+  )
+install(DIRECTORY include/ DESTINATION include)
+install(EXPORT ${PROJECT_NAME}Config DESTINATION lib/cmake/${PROJECT_NAME})
+export(TARGETS ${PROJECT_NAME} FILE ${PROJECT_NAME}Config.cmake)
 
 add_executable(test_socket test/socket.c)
 target_link_libraries(test_socket ${PROJECT_NAME} ${CHECK_LIBRARIES})
