@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 if (WIN32)
-  add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+  add_compile_definitions(
+    _CRT_SECURE_NO_WARNINGS
+    _CRT_NONSTDC_NO_DEPRECATE
+    )
 endif()
 
 project(ipc C)
