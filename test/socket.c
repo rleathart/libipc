@@ -15,28 +15,32 @@
 Socket test_server;
 Socket test_client;
 #ifdef _WIN32
-char *sockname = "\\\\.\\pipe\\socket.c.test_sock";
+char* sockname = "\\\\.\\pipe\\socket.c.test_sock";
 #else
-char *sockname = "socket.c.test_sock";
+char* sockname = "socket.c.test_sock";
 #endif
 
-void setup() {
+void setup()
+{
   socket_destroy(&test_server);
   socket_destroy(&test_client);
 }
 
-void teardown() {
+void teardown()
+{
   socket_destroy(&test_server);
   socket_destroy(&test_client);
 }
 
-START_TEST(test_socket_create) {
+START_TEST(test_socket_create)
+{
   fail_if(socket_create(&test_server, sockname),
           "Could not create a simple socket");
 }
 END_TEST
 
-START_TEST(test_socket_destroy) {
+START_TEST(test_socket_destroy)
+{
   ipcError err = 0;
   char errstr[512];
   socket_create(&test_server, sockname);
@@ -48,10 +52,11 @@ START_TEST(test_socket_destroy) {
 END_TEST
 
 #ifdef _WIN32
-unsigned server_thread(void *arg) {
+unsigned server_thread(void* arg)
+{
   socket_create(&test_server, sockname);
   socket_wait_for_connect(&test_server);
-  char *buffer = malloc(512);
+  char* buffer = malloc(512);
   strcpy(buffer, "Hello from server");
 
   socket_write_bytes(&test_server, buffer, strlen(buffer) + 1);
@@ -66,11 +71,12 @@ unsigned server_thread(void *arg) {
   return 0;
 }
 
-unsigned client_thread(void *arg) {
+unsigned client_thread(void* arg)
+{
   if (socket_connect(&test_client, sockname))
     _endthreadex(1);
 
-  char *buffer = malloc(512);
+  char* buffer = malloc(512);
 
   socket_read_bytes(&test_client, buffer, 512);
   if (strcmp(buffer, "Hello from server") != 0)
@@ -84,7 +90,8 @@ unsigned client_thread(void *arg) {
 }
 #endif
 
-START_TEST(test_socket_server_client) {
+START_TEST(test_socket_server_client)
+{
 #ifdef _WIN32
   HANDLE threads[2];
   threads[0] = (HANDLE)_beginthreadex(NULL, 0, server_thread, NULL, 0, NULL);
@@ -99,10 +106,11 @@ START_TEST(test_socket_server_client) {
           "Client and server could not communicate");
 #else
   pid_t pid = fork();
-  if (pid == 0) {
+  if (pid == 0)
+  {
     socket_create(&test_server, sockname);
     socket_wait_for_connect(&test_server);
-    char *buffer = malloc(512);
+    char* buffer = malloc(512);
     strcpy(buffer, "Hello from server");
 
     socket_write_bytes(&test_server, buffer, strlen(buffer) + 1);
@@ -110,10 +118,12 @@ START_TEST(test_socket_server_client) {
     socket_read_bytes(&test_server, buffer, 512);
 
     fail_if(strcmp(buffer, "Hello from client") != 0);
-  } else {
+  }
+  else
+  {
     fail_if(socket_connect(&test_client, sockname));
 
-    char *buffer = malloc(512);
+    char* buffer = malloc(512);
 
     socket_read_bytes(&test_client, buffer, 512);
     fail_if(strcmp(buffer, "Hello from server") != 0);
@@ -124,10 +134,11 @@ START_TEST(test_socket_server_client) {
 }
 END_TEST
 
-int main(int argc, char **argv) {
-  Suite *s1 = suite_create("Socket");
-  TCase *tc1_1 = tcase_create("Socket");
-  SRunner *sr = srunner_create(s1);
+int main(int argc, char** argv)
+{
+  Suite* s1 = suite_create("Socket");
+  TCase* tc1_1 = tcase_create("Socket");
+  SRunner* sr = srunner_create(s1);
   int num_failed;
 
   setup();

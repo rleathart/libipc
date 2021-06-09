@@ -1,7 +1,9 @@
 #include <ipc/error.h>
 
-char *ipcError_str(ipcError e) {
-  switch (e) {
+char* ipcError_str(ipcError e)
+{
+  switch (e)
+  {
   case ipcErrorNone:
     return "No error";
   case ipcErrorUnknown:

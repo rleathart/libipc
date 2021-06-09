@@ -1,6 +1,7 @@
 #pragma once
 
-typedef enum {
+typedef enum
+{
   ipcErrorNone,
   ipcErrorUnknown,
   ipcErrorSocketOpen,
@@ -14,4 +15,4 @@ typedef enum {
   ipcErrorActualNeqExpected,
 } ipcError;
 
-char *ipcError_str(ipcError e);
+char* ipcError_str(ipcError e);
