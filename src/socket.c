@@ -26,7 +26,7 @@ static ipcError _socket_create(Socket* sock, char* name, int is_server)
   {
     sock->server =
         CreateNamedPipe(name, PIPE_ACCESS_DUPLEX,
-                        PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
+                        PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
                         PIPE_UNLIMITED_INSTANCES, 512, 512, 0, NULL);
   }
   else
