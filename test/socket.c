@@ -55,7 +55,7 @@ END_TEST
 unsigned server_thread(void* arg)
 {
   socket_create(&test_server, sockname);
-  socket_wait_for_connect(&test_server);
+  /* socket_wait_for_connect(&test_server); */
   char* buffer = malloc(512);
   strcpy(buffer, "Hello from server");
 
@@ -73,8 +73,8 @@ unsigned server_thread(void* arg)
 
 unsigned client_thread(void* arg)
 {
-  if (socket_connect(&test_client, sockname))
-    _endthreadex(1);
+  /* if (socket_connect(&test_client, sockname)) */
+  /*   _endthreadex(1); */
 
   char* buffer = malloc(512);
 
@@ -134,6 +134,56 @@ START_TEST(test_socket_server_client)
 }
 END_TEST
 
+unsigned server_thread_new(void* arg)
+{
+  Socket sock = {};
+  ipcError err;
+  while (socket_connect(&sock, sockname, SocketIsServer))
+    ;
+
+  char* buffer = malloc(512);
+  strncpy(buffer, "Hello from server", 512);
+  socket_write_bytes(&sock, buffer, 512);
+  socket_read_bytes(&sock, buffer, 512);
+  if (strcmp(buffer, "Hello from client") != 0)
+    return 1;
+
+  return 0;
+}
+
+unsigned client_thread_new(void* arg)
+{
+  Socket sock = {};
+  ipcError err;
+  while (socket_connect(&sock, sockname, SocketNoFlags))
+    ;
+
+  char* buffer = malloc(512);
+  socket_read_bytes(&sock, buffer, 512);
+  if (strcmp(buffer, "Hello from server") != 0)
+    return 1;
+  strncpy(buffer, "Hello from client", 512);
+  socket_write_bytes(&sock, buffer, 512);
+  return 0;
+}
+
+START_TEST(test_new_socket_server_client)
+{
+#ifdef _WIN32
+  HANDLE threads[2];
+  threads[0] = (HANDLE)_beginthreadex(NULL, 0, server_thread_new, NULL, 0, NULL);
+  threads[1] = (HANDLE)_beginthreadex(NULL, 0, client_thread_new, NULL, 0, NULL);
+  WaitForMultipleObjectsEx(2, threads, TRUE, 2000, FALSE);
+  unsigned long errcodes[2];
+  GetExitCodeThread(threads[0], &errcodes[0]);
+  GetExitCodeThread(threads[1], &errcodes[1]);
+  ck_assert_int_eq(errcodes[0], 0);
+  ck_assert_int_eq(errcodes[1], 0);
+          /* "Client and server could not communicate"); */
+#endif
+}
+END_TEST
+
 int main(int argc, char** argv)
 {
   Suite* s1 = suite_create("Socket");
@@ -144,9 +194,10 @@ int main(int argc, char** argv)
   setup();
 
   tcase_add_checked_fixture(tc1_1, setup, teardown);
-  tcase_add_test(tc1_1, test_socket_create);
-  tcase_add_test(tc1_1, test_socket_destroy);
-  tcase_add_test(tc1_1, test_socket_server_client);
+  /* tcase_add_test(tc1_1, test_socket_create); */
+  /* tcase_add_test(tc1_1, test_socket_destroy); */
+  /* tcase_add_test(tc1_1, test_socket_server_client); */
+  tcase_add_test(tc1_1, test_new_socket_server_client);
   suite_add_tcase(s1, tc1_1);
 
   srunner_run_all(sr, CK_ENV);
