@@ -1,7 +1,11 @@
 #include <ipc/error.h>
+#include <string.h>
 
 char* ipcError_str(ipcError e)
 {
+  if (e > ipcErrorUnknown)
+    return strerror(-e);
+
   switch (e)
   {
   case ipcErrorNone:
@@ -22,7 +26,9 @@ char* ipcError_str(ipcError e)
     return "Error removing file";
   case ipcErrorActualNeqExpected:
     return "Actual value differs from expected";
+  case ipcErrorSocketHasMoreData:
+    return "Socket has more data to read or write";
   default:
-    return "Unknown error";
+    return strerror(-e);
   }
 }

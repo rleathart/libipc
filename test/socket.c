@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/errno.h>
 #include <time.h>
 
 #include <check.h>
@@ -9,6 +10,7 @@
 #include <process.h>
 #include <windows.h>
 #else
+#include <pthread.h>
 #include <unistd.h>
 #endif
 
@@ -18,17 +20,48 @@ char* sockname = "\\\\.\\pipe\\socket.c.test_sock";
 char* sockname = "socket.c.test_sock";
 #endif
 
+#define ELOG(e)                                                                \
+  fprintf(stderr, "Error[%d]: %s:%d: %s\n", e, __FILE__, __LINE__,             \
+          ipcError_str(e))
+
+enum
+{
+  CONNECT_SLEEP_MS = 10,
+  BUFFER_SIZE = 512,
+};
+
+void sleep_ms(int ms)
+{
+#ifdef _WIN32
+  Sleep(ms);
+#else
+  struct timespec ts = {.tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1e6};
+  nanosleep(&ts, NULL);
+#endif
+}
+
 unsigned server_thread(void* arg)
 {
+  ipcError err;
   Socket sock;
-  socket_init(&sock, sockname, SocketIsServer);
+  socket_init(&sock, sockname, SocketServer);
   while (socket_connect(&sock))
-    ;
+    sleep_ms(CONNECT_SLEEP_MS);
 
-  char* buffer = malloc(512);
-  strncpy(buffer, "Hello from server", 512);
-  socket_write_bytes(&sock, buffer, 512);
-  socket_read_bytes(&sock, buffer, 512);
+  char* buffer = malloc(BUFFER_SIZE);
+  strncpy(buffer, "Hello from server", BUFFER_SIZE);
+  size_t read, written = 0;
+  while ((err = socket_write_bytes(&sock, buffer + written, BUFFER_SIZE - written,
+                            &written)) == ipcErrorSocketHasMoreData)
+    ;
+  if (err)
+    ELOG(err);
+  while ((err = socket_read_bytes(&sock, buffer + read, BUFFER_SIZE - read, &read)) ==
+         ipcErrorSocketHasMoreData)
+    ;
+  if (err)
+    ELOG(err);
+
   if (strcmp(buffer, "Hello from client") != 0)
     return 1;
 
@@ -37,22 +70,32 @@ unsigned server_thread(void* arg)
 
 unsigned client_thread(void* arg)
 {
+  ipcError err;
   Socket sock;
   socket_init(&sock, sockname, SocketNoFlags);
   while (socket_connect(&sock))
-    ;
+    sleep_ms(CONNECT_SLEEP_MS);
 
-  char* buffer = malloc(512);
-  socket_read_bytes(&sock, buffer, 512);
+  char* buffer = malloc(BUFFER_SIZE);
+  size_t read, written = 0;
+
+  while ((err = socket_read_bytes(&sock, buffer + read, BUFFER_SIZE - read,
+                            &read)) == ipcErrorSocketHasMoreData)
+    ;
   if (strcmp(buffer, "Hello from server") != 0)
     return 1;
-  strncpy(buffer, "Hello from client", 512);
-  socket_write_bytes(&sock, buffer, 512);
+  strncpy(buffer, "Hello from client", BUFFER_SIZE);
+  while ((err = socket_write_bytes(&sock, buffer + written, BUFFER_SIZE - written,
+                            &written)) == ipcErrorSocketHasMoreData)
+    ;
   return 0;
 }
 
 START_TEST(test_new_socket_server_client)
 {
+#ifdef DEBUG
+  fprintf(stderr, "Running test: %s\n", __FUNCTION__);
+#endif
 #ifdef _WIN32
   HANDLE threads[2];
   threads[0] = (HANDLE)_beginthreadex(NULL, 0, server_thread, NULL, 0, NULL);
@@ -62,6 +105,16 @@ START_TEST(test_new_socket_server_client)
   for (int i = 0; i < 2; i++)
   {
     GetExitCodeThread(threads[i], &errcodes[i]);
+    ck_assert_int_eq(errcodes[i], 0);
+  }
+#else
+  pthread_t threads[2];
+  pthread_create(&threads[0], NULL, (void* (*)(void*))server_thread, NULL);
+  pthread_create(&threads[1], NULL, (void* (*)(void*))client_thread, NULL);
+  unsigned errcodes[2];
+  for (int i = 0; i < 2; i++)
+  {
+    pthread_join(threads[i], (void*)&errcodes[i]);
     ck_assert_int_eq(errcodes[i], 0);
   }
 #endif

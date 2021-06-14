@@ -7,13 +7,29 @@
 #define strdup _strdup
 #include <windows.h>
 #else
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
+#include <time.h>
 
 #include <unistd.h>
+#endif
+
+#define DEBUG
+
+#ifdef DEBUG
+#define SOCKLOG(fmt, ...)                                                      \
+  do                                                                           \
+  {                                                                            \
+    fprintf(stderr, sock->flags& SocketServer ? "Server: " : "Client: ");      \
+    fprintf(stderr, fmt, __VA_ARGS__);                                         \
+  } while (0)
+#else
+#define SOCKLOG(fmt, ...)
 #endif
 
 /* ipcError socket_connect(Socket* sock, char* name, SocketFlags flags) */
@@ -68,57 +84,130 @@ ipcError socket_connect(Socket* sock)
                    NULL, OPEN_EXISTING, 0, NULL);
   }
 #else
+  struct sockaddr_un sock_name = {.sun_family = PF_LOCAL};
+  strncpy(sock_name.sun_path, sock->name, sizeof(sock_name.sun_path));
+
+  if (sock->server < 1)
+  {
+    SOCKLOG("%s\n", "Initalising sock->server...");
+    if ((sock->server = socket(PF_LOCAL, SOCK_STREAM, 0)) < 0)
+      return ipcErrorSocketOpen;
+    SOCKLOG("sock->server: %d\n", sock->server);
+    fcntl(sock->server, F_SETFL, fcntl(sock->server, F_GETFL, 0) | O_NONBLOCK);
+    SOCKLOG("%s\n", "Set O_NONBLOCK");
+  }
+
+  if (sock->flags & SocketServer)
+  {
+    SOCKLOG("Unlinking %s\n", sock->name);
+    unlink(sock->name);
+    if (!(sock->state & SocketBound))
+    {
+      if (bind(sock->server, (struct sockaddr*)&sock_name, sizeof(sock_name)))
+      {
+        SOCKLOG("bind: %s\n", strerror(errno));
+        return ipcErrorSocketCreate;
+      }
+      sock->state |= SocketBound;
+    }
+    SOCKLOG("%s\n", "Successfully bound address");
+    if (!(sock->state & SocketListening))
+    {
+      listen(sock->server, 10);
+      sock->state |= SocketListening;
+    }
+
+    if (sock->client < 1)
+    {
+      SOCKLOG("%s\n", "Initalising sock->client");
+      sock->client = accept(sock->server, NULL, NULL);
+      if (sock->client < 1)
+        return ipcErrorSocketConnect;
+      SOCKLOG("sock->client: %d\n", sock->client);
+      fcntl(sock->client, F_SETFL,
+            fcntl(sock->client, F_GETFL, 0) | O_NONBLOCK);
+    }
+    if (errno == EAGAIN || errno == EWOULDBLOCK)
+      return ipcErrorSocketConnect;
+  }
+  else
+  {
+    if (sock->client < 1)
+    {
+      SOCKLOG("%s\n", "Initalising sock->client");
+      if ((sock->client = socket(PF_LOCAL, SOCK_STREAM, 0)) < 0)
+        return ipcErrorSocketOpen;
+      SOCKLOG("sock->client: %d\n", sock->client);
+      fcntl(sock->client, F_SETFL,
+            fcntl(sock->client, F_GETFL, 0) | O_NONBLOCK);
+    }
+    SOCKLOG("%s\n", "Attempting connect");
+    if (connect(sock->server, (struct sockaddr*)&sock_name, sizeof(sock_name)))
+    {
+      SOCKLOG("connect: %s\n", strerror(errno));
+      return ipcErrorSocketConnect;
+    }
+    SOCKLOG("sock->server: %d\tsock->client: %d\n", sock->server, sock->client);
+  }
 #endif
+
+  sock->state |= SocketConnected;
 
   return ipcErrorNone;
 }
 
-ipcError socket_connect_wait(Socket* sock, char* name, SocketFlags flags,
-                             int sleep_ms)
-{
-  while (socket_connect(sock) != ipcErrorNone)
-#ifdef _WIN32
-    Sleep(sleep_ms);
-#else
-#endif
-
-  return ipcErrorNone;
-}
-
-ipcError socket_write_bytes(Socket* sock, void* buffer, size_t bytes_to_write)
+ipcError socket_write_bytes(Socket* sock, void* buffer, size_t bytes_to_write,
+                            size_t* bytes_written)
 {
   SocketHandle handle;
-  if (sock->flags & SocketIsServer)
+  if (sock->flags & SocketServer)
     handle = sock->client;
   else
     handle = sock->server;
 #ifdef _WIN32
   OVERLAPPED overlap = {
-    .hEvent = CreateEvent(NULL, TRUE, TRUE, NULL),
+      .hEvent = CreateEvent(NULL, TRUE, TRUE, NULL),
   };
   WriteFile(handle, buffer, bytes_to_write, NULL, &overlap);
   WaitForSingleObject(overlap.hEvent, INFINITE);
 #else
-  write(handle, buffer, bytes_to_write);
+  ssize_t rv =
+      send(handle, buffer + *bytes_written, bytes_to_write - *bytes_written, 0);
+  if (rv >= 0)
+    *bytes_written += rv;
+  SOCKLOG("Sent %ld\n", *bytes_written);
+  if (rv < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+    return ipcErrorSocketHasMoreData;
+  if (rv < 0)
+    return -errno;
 #endif
   return ipcErrorNone;
 }
 
-ipcError socket_read_bytes(Socket* sock, void* buffer, size_t bytes_to_read)
+ipcError socket_read_bytes(Socket* sock, void* buffer, size_t bytes_to_read,
+                           size_t* bytes_read)
 {
   SocketHandle handle;
-  if (sock->flags & SocketIsServer)
+  if (sock->flags & SocketServer)
     handle = sock->client;
   else
     handle = sock->server;
 #ifdef _WIN32
   OVERLAPPED overlap = {
-    .hEvent = CreateEvent(NULL, TRUE, TRUE, NULL),
+      .hEvent = CreateEvent(NULL, TRUE, TRUE, NULL),
   };
   ReadFile(handle, buffer, bytes_to_read, NULL, &overlap);
   WaitForSingleObject(overlap.hEvent, INFINITE);
 #else
-  read(handle, buffer, bytes_to_read);
+  ssize_t rv =
+      recv(handle, buffer + *bytes_read, bytes_to_read - *bytes_read, 0);
+  if (rv >= 0)
+    *bytes_read += rv;
+  SOCKLOG("Read %ld\n", *bytes_read);
+  if (rv < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+    return ipcErrorSocketHasMoreData;
+  if (rv < 0)
+    return -errno;
 #endif
   return ipcErrorNone;
 }
