@@ -55,7 +55,7 @@ void socket_init(Socket* sock, char* name, SocketFlags flags)
 ipcError socket_connect(Socket* sock)
 {
 #ifdef _WIN32
-  if (sock->flags & SocketIsServer)
+  if (sock->flags & SocketServer)
   {
     if (!sock->server)
       sock->server = sock->client =
@@ -169,7 +169,11 @@ ipcError socket_write_bytes(Socket* sock, void* buffer, size_t bytes_to_write,
       .hEvent = CreateEvent(NULL, TRUE, TRUE, NULL),
   };
   WriteFile(handle, buffer, bytes_to_write, NULL, &overlap);
-  WaitForSingleObject(overlap.hEvent, INFINITE);
+  GetOverlappedResult(handle, &overlap, (LPDWORD)bytes_written, FALSE);
+  DWORD lasterr = GetLastError();
+  size_t _written = *bytes_written;
+  if (lasterr == ERROR_IO_INCOMPLETE)
+    return ipcErrorSocketHasMoreData;
 #else
   ssize_t rv =
       send(handle, buffer + *bytes_written, bytes_to_write - *bytes_written, 0);
@@ -197,7 +201,11 @@ ipcError socket_read_bytes(Socket* sock, void* buffer, size_t bytes_to_read,
       .hEvent = CreateEvent(NULL, TRUE, TRUE, NULL),
   };
   ReadFile(handle, buffer, bytes_to_read, NULL, &overlap);
-  WaitForSingleObject(overlap.hEvent, INFINITE);
+  GetOverlappedResult(handle, &overlap, (LPDWORD)bytes_read, FALSE);
+  DWORD lasterr = GetLastError();
+  size_t _read = *bytes_read;
+  if (lasterr == ERROR_IO_INCOMPLETE)
+    return ipcErrorSocketHasMoreData;
 #else
   ssize_t rv =
       recv(handle, buffer + *bytes_read, bytes_to_read - *bytes_read, 0);

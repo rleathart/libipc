@@ -1,16 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/errno.h>
 #include <time.h>
 
 #include <check.h>
 #include <ipc/socket.h>
 
 #ifdef _WIN32
+#include <errno.h>
 #include <process.h>
 #include <windows.h>
 #else
 #include <pthread.h>
+#include <sys/errno.h>
 #include <unistd.h>
 #endif
 
@@ -51,19 +52,22 @@ unsigned server_thread(void* arg)
   char* buffer = malloc(BUFFER_SIZE);
   strncpy(buffer, "Hello from server", BUFFER_SIZE);
   size_t read, written = 0;
-  while ((err = socket_write_bytes(&sock, buffer + written, BUFFER_SIZE - written,
-                            &written)) == ipcErrorSocketHasMoreData)
+  while ((err = socket_write_bytes(&sock, buffer + written,
+                                   BUFFER_SIZE - written, &written)) ==
+         ipcErrorSocketHasMoreData)
     ;
   if (err)
     ELOG(err);
-  while ((err = socket_read_bytes(&sock, buffer + read, BUFFER_SIZE - read, &read)) ==
-         ipcErrorSocketHasMoreData)
+  while ((err = socket_read_bytes(&sock, buffer + read, BUFFER_SIZE - read,
+                                  &read)) == ipcErrorSocketHasMoreData)
     ;
   if (err)
     ELOG(err);
 
   if (strcmp(buffer, "Hello from client") != 0)
     return 1;
+
+  printf("%s\n", buffer);
 
   return 0;
 }
@@ -80,13 +84,15 @@ unsigned client_thread(void* arg)
   size_t read, written = 0;
 
   while ((err = socket_read_bytes(&sock, buffer + read, BUFFER_SIZE - read,
-                            &read)) == ipcErrorSocketHasMoreData)
+                                  &read)) == ipcErrorSocketHasMoreData)
     ;
   if (strcmp(buffer, "Hello from server") != 0)
     return 1;
+  printf("%s\n", buffer);
   strncpy(buffer, "Hello from client", BUFFER_SIZE);
-  while ((err = socket_write_bytes(&sock, buffer + written, BUFFER_SIZE - written,
-                            &written)) == ipcErrorSocketHasMoreData)
+  while ((err = socket_write_bytes(&sock, buffer + written,
+                                   BUFFER_SIZE - written, &written)) ==
+         ipcErrorSocketHasMoreData)
     ;
   return 0;
 }
