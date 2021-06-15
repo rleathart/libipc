@@ -92,10 +92,10 @@ ipcError socket_connect(Socket* sock)
 
   if (sock->flags & SocketServer)
   {
-    SOCKLOG("Unlinking %s\n", sock->name);
-    unlink(sock->name);
     if (!(sock->state.flags & SocketBound))
     {
+      SOCKLOG("Unlinking %s\n", sock->name);
+      unlink(sock->name);
       if (bind(sock->server, (struct sockaddr*)&sock_name, sizeof(sock_name)))
       {
         SOCKLOG("bind: %s\n", strerror(errno));
@@ -199,7 +199,10 @@ static ipcError _socket_transact(Socket* sock, void* buffer, size_t bytes,
 #endif
 
   if (err != ipcErrorSocketHasMoreData)
+  {
     sock->state.flags ^= is_write ? SocketWriting : SocketReading;
+    *bytes_out = 0;
+  }
   return err;
 }
 
