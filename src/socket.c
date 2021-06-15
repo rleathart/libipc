@@ -1,4 +1,5 @@
 #include <ipc/socket.h>
+#include <stdint.h>
 #include <string.h>
 
 #include <stdio.h>
@@ -19,9 +20,7 @@
 #include <unistd.h>
 #endif
 
-#define DEBUG
-
-#ifdef DEBUG
+#ifdef _DEBUG
 #define SOCKLOG(fmt, ...)                                                      \
   do                                                                           \
   {                                                                            \
@@ -32,23 +31,15 @@
 #define SOCKLOG(fmt, ...)
 #endif
 
-/* ipcError socket_connect(Socket* sock, char* name, SocketFlags flags) */
-/* { */
-/*   if (sock->flags & WAITING) */
-/*   static Thread; */
-/*   if (ThreadAlreadyCreated) */
-/*     return threadstatus; */
-/*   else */
-/*     spawnthread; */
-/* } */
-
 void socket_init(Socket* sock, char* name, SocketFlags flags)
 {
   memset(sock, 0, sizeof(Socket));
   sock->name = strdup(name);
   sock->flags = flags;
 #ifdef _WIN32
-  sock->_overlap.hEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
+  sock->state.overlap.hEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
+  sock->state.overlap_read.hEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
+  sock->state.overlap_write.hEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
 #endif
 }
 
@@ -63,14 +54,14 @@ ipcError socket_connect(Socket* sock)
                           PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
                           PIPE_UNLIMITED_INSTANCES, 512, 512, 0, NULL);
 
-    ConnectNamedPipe(sock->server, &sock->_overlap);
+    ConnectNamedPipe(sock->server, &(sock->state.overlap));
     switch (GetLastError())
     {
     case ERROR_IO_PENDING:
       return ipcErrorSocketConnect;
     case ERROR_PIPE_CONNECTED:
-      SetEvent(sock->_overlap.hEvent);
-      return ipcErrorNone;
+      SetEvent(sock->state.overlap.hEvent);
+      break;
     default:
       return ipcErrorUnknown;
     }
@@ -82,6 +73,8 @@ ipcError socket_connect(Socket* sock)
     sock->server = sock->client =
         CreateFile(sock->name, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE,
                    NULL, OPEN_EXISTING, 0, NULL);
+    if (GetLastError() == ERROR_FILE_NOT_FOUND)
+      return ipcErrorSocketOpen;
   }
 #else
   struct sockaddr_un sock_name = {.sun_family = PF_LOCAL};
@@ -101,20 +94,20 @@ ipcError socket_connect(Socket* sock)
   {
     SOCKLOG("Unlinking %s\n", sock->name);
     unlink(sock->name);
-    if (!(sock->state & SocketBound))
+    if (!(sock->state.flags & SocketBound))
     {
       if (bind(sock->server, (struct sockaddr*)&sock_name, sizeof(sock_name)))
       {
         SOCKLOG("bind: %s\n", strerror(errno));
         return ipcErrorSocketCreate;
       }
-      sock->state |= SocketBound;
+      sock->state.flags |= SocketBound;
     }
     SOCKLOG("%s\n", "Successfully bound address");
-    if (!(sock->state & SocketListening))
+    if (!(sock->state.flags & SocketListening))
     {
       listen(sock->server, 10);
-      sock->state |= SocketListening;
+      sock->state.flags |= SocketListening;
     }
 
     if (sock->client < 1)
@@ -151,73 +144,73 @@ ipcError socket_connect(Socket* sock)
   }
 #endif
 
-  sock->state |= SocketConnected;
+  SOCKLOG("Successfully connected socket with\n\tname: %s\n\tserver: "
+          "%lld\n\tclient: %lld\n",
+          sock->name, (int64_t)sock->server, (int64_t)sock->client);
+
+  sock->state.flags |= SocketConnected;
 
   return ipcErrorNone;
 }
 
-ipcError socket_write_bytes(Socket* sock, void* buffer, size_t bytes_to_write,
-                            size_t* bytes_written)
+static ipcError _socket_transact(Socket* sock, void* buffer, size_t bytes,
+                                 int is_write)
 {
-  SocketHandle handle;
-  if (sock->flags & SocketServer)
-    handle = sock->client;
-  else
-    handle = sock->server;
+  ipcError err = 0;
+  SocketHandle handle =
+      (sock->flags & SocketServer) ? sock->client : sock->server;
+
+  size_t* bytes_out =
+      is_write ? &(sock->state.bytes_written) : &(sock->state.bytes_written);
+
 #ifdef _WIN32
-  OVERLAPPED overlap = {
-      .hEvent = CreateEvent(NULL, TRUE, TRUE, NULL),
-  };
-  WriteFile(handle, buffer, bytes_to_write, NULL, &overlap);
-  GetOverlappedResult(handle, &overlap, (LPDWORD)bytes_written, FALSE);
+
+  OVERLAPPED* overlap =
+      is_write ? &(sock->state.overlap_write) : &(sock->state.overlap_write);
+  if (!(sock->state.flags & (is_write ? SocketWriting : SocketReading)))
+  {
+    if (is_write)
+      WriteFile(handle, buffer, bytes, NULL, overlap);
+    else
+      ReadFile(handle, buffer, bytes, NULL, overlap);
+    sock->state.flags |= is_write ? SocketWriting : SocketReading;
+  }
+  GetOverlappedResult(handle, overlap, (LPDWORD)bytes_out, FALSE);
   DWORD lasterr = GetLastError();
-  size_t _written = *bytes_written;
   if (lasterr == ERROR_IO_INCOMPLETE)
     return ipcErrorSocketHasMoreData;
+  if (lasterr)
+    err = -lasterr;
+
 #else
-  ssize_t rv =
-      send(handle, buffer + *bytes_written, bytes_to_write - *bytes_written, 0);
+
+  ssize_t rv;
+  if (is_write)
+    rv = send(handle, buffer + *bytes_out, bytes - *bytes_out, 0);
+  else
+    rv = recv(handle, buffer + *bytes_out, bytes - *bytes_out, 0);
   if (rv >= 0)
-    *bytes_written += rv;
-  SOCKLOG("Sent %ld\n", *bytes_written);
+    *bytes_out += rv;
   if (rv < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
     return ipcErrorSocketHasMoreData;
   if (rv < 0)
-    return -errno;
+    err = -errno;
+
 #endif
-  return ipcErrorNone;
+
+  if (err != ipcErrorSocketHasMoreData)
+    sock->state.flags ^= is_write ? SocketWriting : SocketReading;
+  return err;
 }
 
-ipcError socket_read_bytes(Socket* sock, void* buffer, size_t bytes_to_read,
-                           size_t* bytes_read)
+ipcError socket_write_bytes(Socket* sock, void* buffer, size_t bytes_to_write)
 {
-  SocketHandle handle;
-  if (sock->flags & SocketServer)
-    handle = sock->client;
-  else
-    handle = sock->server;
-#ifdef _WIN32
-  OVERLAPPED overlap = {
-      .hEvent = CreateEvent(NULL, TRUE, TRUE, NULL),
-  };
-  ReadFile(handle, buffer, bytes_to_read, NULL, &overlap);
-  GetOverlappedResult(handle, &overlap, (LPDWORD)bytes_read, FALSE);
-  DWORD lasterr = GetLastError();
-  size_t _read = *bytes_read;
-  if (lasterr == ERROR_IO_INCOMPLETE)
-    return ipcErrorSocketHasMoreData;
-#else
-  ssize_t rv =
-      recv(handle, buffer + *bytes_read, bytes_to_read - *bytes_read, 0);
-  if (rv >= 0)
-    *bytes_read += rv;
-  SOCKLOG("Read %ld\n", *bytes_read);
-  if (rv < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
-    return ipcErrorSocketHasMoreData;
-  if (rv < 0)
-    return -errno;
-#endif
-  return ipcErrorNone;
+  return _socket_transact(sock, buffer, bytes_to_write, 1);
+}
+
+ipcError socket_read_bytes(Socket* sock, void* buffer, size_t bytes_to_read)
+{
+  return _socket_transact(sock, buffer, bytes_to_read, 0);
 }
 
 ipcError socket_destroy(Socket* sock)

@@ -51,23 +51,16 @@ unsigned server_thread(void* arg)
 
   char* buffer = malloc(BUFFER_SIZE);
   strncpy(buffer, "Hello from server", BUFFER_SIZE);
-  size_t read, written = 0;
-  while ((err = socket_write_bytes(&sock, buffer + written,
-                                   BUFFER_SIZE - written, &written)) ==
+  while ((err = socket_write_bytes(&sock, buffer, BUFFER_SIZE)) ==
          ipcErrorSocketHasMoreData)
     ;
-  if (err)
-    ELOG(err);
-  while ((err = socket_read_bytes(&sock, buffer + read, BUFFER_SIZE - read,
-                                  &read)) == ipcErrorSocketHasMoreData)
+
+  while ((err = socket_read_bytes(&sock, buffer, BUFFER_SIZE)) ==
+         ipcErrorSocketHasMoreData)
     ;
-  if (err)
-    ELOG(err);
 
   if (strcmp(buffer, "Hello from client") != 0)
     return 1;
-
-  printf("%s\n", buffer);
 
   return 0;
 }
@@ -81,17 +74,14 @@ unsigned client_thread(void* arg)
     sleep_ms(CONNECT_SLEEP_MS);
 
   char* buffer = malloc(BUFFER_SIZE);
-  size_t read, written = 0;
 
-  while ((err = socket_read_bytes(&sock, buffer + read, BUFFER_SIZE - read,
-                                  &read)) == ipcErrorSocketHasMoreData)
+  while ((err = socket_read_bytes(&sock, buffer, BUFFER_SIZE)) ==
+         ipcErrorSocketHasMoreData)
     ;
   if (strcmp(buffer, "Hello from server") != 0)
     return 1;
-  printf("%s\n", buffer);
   strncpy(buffer, "Hello from client", BUFFER_SIZE);
-  while ((err = socket_write_bytes(&sock, buffer + written,
-                                   BUFFER_SIZE - written, &written)) ==
+  while ((err = socket_write_bytes(&sock, buffer, BUFFER_SIZE)) ==
          ipcErrorSocketHasMoreData)
     ;
   return 0;
@@ -99,30 +89,30 @@ unsigned client_thread(void* arg)
 
 START_TEST(test_new_socket_server_client)
 {
-#ifdef DEBUG
+#ifdef _DEBUG
   fprintf(stderr, "Running test: %s\n", __FUNCTION__);
 #endif
 #ifdef _WIN32
-  HANDLE threads[2];
-  threads[0] = (HANDLE)_beginthreadex(NULL, 0, server_thread, NULL, 0, NULL);
-  threads[1] = (HANDLE)_beginthreadex(NULL, 0, client_thread, NULL, 0, NULL);
-  WaitForMultipleObjectsEx(2, threads, TRUE, 2000, FALSE);
-  unsigned long errcodes[2];
-  for (int i = 0; i < 2; i++)
-  {
-    GetExitCodeThread(threads[i], &errcodes[i]);
-    ck_assert_int_eq(errcodes[i], 0);
-  }
+    HANDLE threads[2];
+    threads[0] = (HANDLE)_beginthreadex(NULL, 0, server_thread, NULL, 0, NULL);
+    threads[1] = (HANDLE)_beginthreadex(NULL, 0, client_thread, NULL, 0, NULL);
+    WaitForMultipleObjectsEx(2, threads, TRUE, 2000, FALSE);
+    unsigned long errcodes[2];
+    for (int i = 0; i < 2; i++)
+    {
+      GetExitCodeThread(threads[i], &errcodes[i]);
+      ck_assert_int_eq(errcodes[i], 0);
+    }
 #else
-  pthread_t threads[2];
-  pthread_create(&threads[0], NULL, (void* (*)(void*))server_thread, NULL);
-  pthread_create(&threads[1], NULL, (void* (*)(void*))client_thread, NULL);
-  unsigned errcodes[2];
-  for (int i = 0; i < 2; i++)
-  {
-    pthread_join(threads[i], (void*)&errcodes[i]);
-    ck_assert_int_eq(errcodes[i], 0);
-  }
+    pthread_t threads[2];
+    pthread_create(&threads[0], NULL, (void* (*)(void*))server_thread, NULL);
+    pthread_create(&threads[1], NULL, (void* (*)(void*))client_thread, NULL);
+    unsigned errcodes[2];
+    for (int i = 0; i < 2; i++)
+    {
+      pthread_join(threads[i], (void*)&errcodes[i]);
+      ck_assert_int_eq(errcodes[i], 0);
+    }
 #endif
 }
 END_TEST
