@@ -212,7 +212,7 @@ static ipcError _socket_transact(Socket* sock, void* buffer, size_t bytes,
   if (rv < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
     return ipcErrorSocketHasMoreData;
   if (rv < 0)
-    err = errno | ipcErrorIsErrnoError;
+    err = errno | ipcErrorIsErrno;
 
 #endif
 
