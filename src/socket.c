@@ -51,7 +51,7 @@ ipcError socket_disconnect(Socket *sock)
   close(sock->server);
   close(sock->client);
 #endif
-  sock->server = sock->client = NULL;
+  sock->server = sock->client = 0;
   sock->state.flags &= ~SocketConnected;
   return ipcErrorNone;
 }
