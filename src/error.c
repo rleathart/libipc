@@ -1,10 +1,36 @@
 #include <ipc/error.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <windows.h>
+static char* get_win32_error_str(DWORD err)
+{
+  char* buffer;
+  DWORD bufLen = FormatMessageA(
+      FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+          FORMAT_MESSAGE_IGNORE_INSERTS,
+      NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&buffer, 0,
+      NULL);
+  // win32 error string has newline at the end?
+  buffer[strlen(buffer) - 1] = '\0';
+  return buffer;
+}
+#endif
+
+ipcError ipcError_int(ipcError e)
+{
+  return e & ~(ipcErrorIsWin32Error | ipcErrorIsErrnoError);
+}
+
 char* ipcError_str(ipcError e)
 {
-  if (e > ipcErrorUnknown)
-    return strerror(-e);
+  if (e & ipcErrorIsErrnoError)
+    return strerror(ipcError_int(e));
+
+#ifdef _WIN32
+  if (e & ipcErrorIsWin32Error)
+    return get_win32_error_str(ipcError_int(e));
+#endif
 
   switch (e)
   {
@@ -29,6 +55,6 @@ char* ipcError_str(ipcError e)
   case ipcErrorSocketHasMoreData:
     return "Socket has more data to read or write";
   default:
-    return strerror(-e);
+    return "Unknown error";
   }
 }

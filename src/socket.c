@@ -69,15 +69,19 @@ ipcError socket_connect(Socket* sock)
                           PIPE_UNLIMITED_INSTANCES, 512, 512, 0, NULL);
 
     ConnectNamedPipe(sock->server, &(sock->state.overlap));
-    switch (GetLastError())
+    DWORD err;
+    switch ((err = GetLastError()))
     {
     case ERROR_IO_PENDING:
       return ipcErrorSocketConnect;
     case ERROR_PIPE_CONNECTED:
       SetEvent(sock->state.overlap.hEvent);
       break;
+    case ERROR_NO_DATA:
+      socket_disconnect(sock);
+      return err | ipcErrorIsWin32Error;
     default:
-      return ipcErrorUnknown;
+      return err | ipcErrorIsWin32Error;
     }
   }
   else
@@ -194,7 +198,7 @@ static ipcError _socket_transact(Socket* sock, void* buffer, size_t bytes,
   if (lasterr == ERROR_IO_INCOMPLETE)
     return ipcErrorSocketHasMoreData;
   if (lasterr)
-    err = -lasterr;
+    err = lasterr | ipcErrorIsWin32Error;
 
 #else
 
@@ -208,7 +212,7 @@ static ipcError _socket_transact(Socket* sock, void* buffer, size_t bytes,
   if (rv < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
     return ipcErrorSocketHasMoreData;
   if (rv < 0)
-    err = -errno;
+    err = errno | ipcErrorIsErrnoError;
 
 #endif
 
