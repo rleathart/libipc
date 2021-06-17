@@ -234,3 +234,28 @@ ipcError socket_destroy(Socket* sock)
 
   return err;
 }
+
+bool socket_is_connected(Socket *sock)
+{
+  if (!(sock->state.flags & SocketConnected))
+    return false;
+  SocketHandle handle = (sock->flags & SocketServer) ? sock->client : sock->server;
+#ifdef _WIN32
+  ReadFile(handle, NULL, 0, NULL, NULL);
+  switch (GetLastError())
+  {
+  case ERROR_PIPE_NOT_CONNECTED:
+  case ERROR_BROKEN_PIPE:
+  case ERROR_NO_DATA:
+    return false;
+  }
+#else
+  int error = 0;
+  socklen_t len = sizeof(error);
+  int rv = getsockopt (handle, SOL_SOCKET, SO_ERROR, &error, &len);
+  if (rv || error)
+    return false;
+#endif
+
+  return true;
+}

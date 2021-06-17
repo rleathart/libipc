@@ -2,6 +2,7 @@
 
 #include <ipc/error.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -59,3 +60,4 @@ ipcError socket_connect(Socket* sock);
 ipcError socket_destroy(Socket* sock);
 ipcError socket_write_bytes(Socket* sock, void* buffer, size_t bytes_to_write);
 ipcError socket_read_bytes(Socket* sock, void* buffer, size_t bytes_to_read);
+bool socket_is_connected(Socket* sock);
