@@ -79,9 +79,9 @@ ipcError socket_connect(Socket* sock)
       break;
     case ERROR_NO_DATA:
       socket_disconnect(sock);
-      return err | ipcErrorIsWin32Error;
+      return err | ipcErrorIsWin32;
     default:
-      return err | ipcErrorIsWin32Error;
+      return err | ipcErrorIsWin32;
     }
   }
   else
@@ -198,7 +198,7 @@ static ipcError _socket_transact(Socket* sock, void* buffer, size_t bytes,
   if (lasterr == ERROR_IO_INCOMPLETE)
     return ipcErrorSocketHasMoreData;
   if (lasterr)
-    err = lasterr | ipcErrorIsWin32Error;
+    err = lasterr | ipcErrorIsWin32;
 
 #else
 

@@ -21,8 +21,8 @@ typedef enum
   // things like
   // return errno | ipcErrorIsErrnoError;
   // and then strerror(err & ~ipcErrorIsErrnoError);
-  ipcErrorIsWin32Error = 1 << (sizeof(int) * 8 - 2),
-  ipcErrorIsErrnoError = 1 << (sizeof(int) * 8 - 1),
+  ipcErrorIsWin32 = 1 << (sizeof(int) * 8 - 2),
+  ipcErrorIsErrno = 1 << (sizeof(int) * 8 - 1),
 } ipcError;
 
 /// @return Integer error code with indicator flags removed.

@@ -19,16 +19,16 @@ static char* get_win32_error_str(DWORD err)
 
 ipcError ipcError_int(ipcError e)
 {
-  return e & ~(ipcErrorIsWin32Error | ipcErrorIsErrnoError);
+  return e & ~(ipcErrorIsWin32 | ipcErrorIsErrno);
 }
 
 char* ipcError_str(ipcError e)
 {
-  if (e & ipcErrorIsErrnoError)
+  if (e & ipcErrorIsErrno)
     return strerror(ipcError_int(e));
 
 #ifdef _WIN32
-  if (e & ipcErrorIsWin32Error)
+  if (e & ipcErrorIsWin32)
     return get_win32_error_str(ipcError_int(e));
 #endif
 
