@@ -43,8 +43,22 @@ void socket_init(Socket* sock, char* name, SocketFlags flags)
 #endif
 }
 
+ipcError socket_disconnect(Socket *sock)
+{
+#ifdef _WIN32
+  DisconnectNamedPipe(sock->server);
+#else
+  close(sock->server);
+  close(sock->client);
+#endif
+  sock->server = sock->client = NULL;
+  sock->state.flags &= ~SocketConnected;
+  return ipcErrorNone;
+}
+
 ipcError socket_connect(Socket* sock)
 {
+  sock->state.flags &= ~SocketConnected;
 #ifdef _WIN32
   if (sock->flags & SocketServer)
   {
