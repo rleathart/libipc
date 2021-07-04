@@ -9,6 +9,14 @@ endif()
 
 project(ipc C)
 
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "" FORCE)
+endif()
+
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+  add_compile_definitions(_DEBUG=1 DEBUG=1)
+endif()
+
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS YES CACHE BOOL "Export all symbols")
 
 include(CTest)

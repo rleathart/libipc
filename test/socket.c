@@ -6,130 +6,113 @@
 #include <ipc/socket.h>
 
 #ifdef _WIN32
+#include <errno.h>
 #include <process.h>
 #include <windows.h>
 #else
+#include <pthread.h>
+#include <sys/errno.h>
 #include <unistd.h>
 #endif
 
-Socket test_server;
-Socket test_client;
 #ifdef _WIN32
 char* sockname = "\\\\.\\pipe\\socket.c.test_sock";
 #else
 char* sockname = "socket.c.test_sock";
 #endif
 
-void setup()
-{
-  socket_destroy(&test_server);
-  socket_destroy(&test_client);
-}
+#define ELOG(e)                                                                \
+  fprintf(stderr, "Error[%d]: %s:%d: %s\n", e, __FILE__, __LINE__,             \
+          ipcError_str(e))
 
-void teardown()
+enum
 {
-  socket_destroy(&test_server);
-  socket_destroy(&test_client);
-}
+  CONNECT_SLEEP_MS = 10,
+  BUFFER_SIZE = 512,
+};
 
-START_TEST(test_socket_create)
+void sleep_ms(int ms)
 {
-  fail_if(socket_create(&test_server, sockname),
-          "Could not create a simple socket");
-}
-END_TEST
-
-START_TEST(test_socket_destroy)
-{
-  ipcError err = 0;
-  char errstr[512];
-  socket_create(&test_server, sockname);
-  err = socket_destroy(&test_server);
-  sprintf(errstr, "Could not destroy a simple socket.\n\t%s",
-          ipcError_str(err));
-  fail_if(err, errstr);
-}
-END_TEST
-
 #ifdef _WIN32
+  Sleep(ms);
+#else
+  struct timespec ts = {.tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1e6};
+  nanosleep(&ts, NULL);
+#endif
+}
+
 unsigned server_thread(void* arg)
 {
-  socket_create(&test_server, sockname);
-  socket_wait_for_connect(&test_server);
-  char* buffer = malloc(512);
-  strcpy(buffer, "Hello from server");
+  ipcError err;
+  Socket sock;
+  socket_init(&sock, sockname, SocketServer);
+  while (socket_connect(&sock))
+    sleep_ms(CONNECT_SLEEP_MS);
 
-  socket_write_bytes(&test_server, buffer, strlen(buffer) + 1);
+  char* buffer = malloc(BUFFER_SIZE);
+  strncpy(buffer, "Hello from server", BUFFER_SIZE);
+  while ((err = socket_write_bytes(&sock, buffer, BUFFER_SIZE)) ==
+         ipcErrorSocketHasMoreData)
+    ;
 
-  socket_read_bytes(&test_server, buffer, 512);
+  while ((err = socket_read_bytes(&sock, buffer, BUFFER_SIZE)) ==
+         ipcErrorSocketHasMoreData)
+    ;
 
   if (strcmp(buffer, "Hello from client") != 0)
-    _endthreadex(1);
-
-  _endthreadex(0);
+    return 1;
 
   return 0;
 }
 
 unsigned client_thread(void* arg)
 {
-  if (socket_connect(&test_client, sockname))
-    _endthreadex(1);
+  ipcError err;
+  Socket sock;
+  socket_init(&sock, sockname, SocketNoFlags);
+  while (socket_connect(&sock))
+    sleep_ms(CONNECT_SLEEP_MS);
 
-  char* buffer = malloc(512);
+  char* buffer = malloc(BUFFER_SIZE);
 
-  socket_read_bytes(&test_client, buffer, 512);
+  while ((err = socket_read_bytes(&sock, buffer, BUFFER_SIZE)) ==
+         ipcErrorSocketHasMoreData)
+    ;
   if (strcmp(buffer, "Hello from server") != 0)
-    _endthreadex(1);
-  strcpy(buffer, "Hello from client");
-  socket_write_bytes(&test_client, buffer, strlen(buffer) + 1);
-
-  _endthreadex(0);
-
+    return 1;
+  strncpy(buffer, "Hello from client", BUFFER_SIZE);
+  while ((err = socket_write_bytes(&sock, buffer, BUFFER_SIZE)) ==
+         ipcErrorSocketHasMoreData)
+    ;
   return 0;
 }
-#endif
 
-START_TEST(test_socket_server_client)
+START_TEST(test_new_socket_server_client)
 {
+#ifdef _DEBUG
+  fprintf(stderr, "Running test: %s\n", __FUNCTION__);
+#endif
 #ifdef _WIN32
-  HANDLE threads[2];
-  threads[0] = (HANDLE)_beginthreadex(NULL, 0, server_thread, NULL, 0, NULL);
-  threads[1] = (HANDLE)_beginthreadex(NULL, 0, client_thread, NULL, 0, NULL);
-  WaitForMultipleObjectsEx(2, threads, TRUE, 2000, FALSE);
-  TerminateThread(threads[0], 2);
-  TerminateThread(threads[1], 2);
-  unsigned long errcodes[2] = {0};
-  GetExitCodeThread(threads[0], &errcodes[0]);
-  GetExitCodeThread(threads[1], &errcodes[1]);
-  fail_if(errcodes[0] || errcodes[1],
-          "Client and server could not communicate");
+    HANDLE threads[2];
+    threads[0] = (HANDLE)_beginthreadex(NULL, 0, server_thread, NULL, 0, NULL);
+    threads[1] = (HANDLE)_beginthreadex(NULL, 0, client_thread, NULL, 0, NULL);
+    WaitForMultipleObjectsEx(2, threads, TRUE, 2000, FALSE);
+    unsigned long errcodes[2];
+    for (int i = 0; i < 2; i++)
+    {
+      GetExitCodeThread(threads[i], &errcodes[i]);
+      ck_assert_int_eq(errcodes[i], 0);
+    }
 #else
-  pid_t pid = fork();
-  if (pid == 0)
-  {
-    socket_create(&test_server, sockname);
-    socket_wait_for_connect(&test_server);
-    char* buffer = malloc(512);
-    strcpy(buffer, "Hello from server");
-
-    socket_write_bytes(&test_server, buffer, strlen(buffer) + 1);
-
-    socket_read_bytes(&test_server, buffer, 512);
-
-    fail_if(strcmp(buffer, "Hello from client") != 0);
-  }
-  else
-  {
-    fail_if(socket_connect(&test_client, sockname));
-
-    char* buffer = malloc(512);
-
-    socket_read_bytes(&test_client, buffer, 512);
-    fail_if(strcmp(buffer, "Hello from server") != 0);
-    strcpy(buffer, "Hello from client");
-    socket_write_bytes(&test_client, buffer, strlen(buffer) + 1);
-  }
+    pthread_t threads[2];
+    pthread_create(&threads[0], NULL, (void* (*)(void*))server_thread, NULL);
+    pthread_create(&threads[1], NULL, (void* (*)(void*))client_thread, NULL);
+    unsigned errcodes[2];
+    for (int i = 0; i < 2; i++)
+    {
+      pthread_join(threads[i], (void*)&errcodes[i]);
+      ck_assert_int_eq(errcodes[i], 0);
+    }
 #endif
 }
 END_TEST
@@ -141,19 +124,12 @@ int main(int argc, char** argv)
   SRunner* sr = srunner_create(s1);
   int num_failed;
 
-  setup();
-
-  tcase_add_checked_fixture(tc1_1, setup, teardown);
-  tcase_add_test(tc1_1, test_socket_create);
-  tcase_add_test(tc1_1, test_socket_destroy);
-  tcase_add_test(tc1_1, test_socket_server_client);
+  tcase_add_test(tc1_1, test_new_socket_server_client);
   suite_add_tcase(s1, tc1_1);
 
   srunner_run_all(sr, CK_ENV);
   num_failed = srunner_ntests_failed(sr);
   srunner_free(sr);
-
-  teardown();
 
 #ifdef _WIN32
 #else
