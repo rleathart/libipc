@@ -19,13 +19,6 @@ endif()
 
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS YES CACHE BOOL "Export all symbols")
 
-include(CTest)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(CHECK REQUIRED check)
-
-include_directories(include ${CHECK_INCLUDE_DIRS})
-link_directories(${CHECK_LIBRARY_DIRS})
-
 add_library(${PROJECT_NAME}
   src/socket.c
   src/error.c
@@ -44,6 +37,14 @@ install(DIRECTORY include/ DESTINATION include)
 install(EXPORT ${PROJECT_NAME}Config DESTINATION lib/cmake/${PROJECT_NAME})
 export(TARGETS ${PROJECT_NAME} FILE ${PROJECT_NAME}Config.cmake)
 
-add_executable(test_socket test/socket.c)
-target_link_libraries(test_socket ${PROJECT_NAME} ${CHECK_LIBRARIES})
-add_test(NAME socket COMMAND test_socket)
+if(IPC_BUILD_TESTS)
+  include(CTest)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(CHECK REQUIRED check)
+
+  include_directories(include ${CHECK_INCLUDE_DIRS})
+  link_directories(${CHECK_LIBRARY_DIRS})
+  add_executable(test_socket test/socket.c)
+  target_link_libraries(test_socket ${PROJECT_NAME} ${CHECK_LIBRARIES})
+  add_test(NAME socket COMMAND test_socket)
+endif()
