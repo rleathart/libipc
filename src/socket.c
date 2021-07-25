@@ -1,6 +1,7 @@
 #include <ipc/socket.h>
 #include <stdint.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include <stdio.h>
 
@@ -59,6 +60,9 @@ ipcError socket_disconnect(Socket *sock)
 ipcError socket_connect(Socket* sock)
 {
   sock->state.flags &= ~SocketConnected;
+  // Need to make sure there's no lingering errno
+  errno = 0;
+
 #ifdef _WIN32
   if (sock->flags & SocketServer)
   {
@@ -120,12 +124,13 @@ ipcError socket_connect(Socket* sock)
         return ipcErrorSocketCreate;
       }
       sock->state.flags |= SocketBound;
+      SOCKLOG("%s\n", "Successfully bound address");
     }
-    SOCKLOG("%s\n", "Successfully bound address");
     if (!(sock->state.flags & SocketListening))
     {
       listen(sock->server, 10);
       sock->state.flags |= SocketListening;
+      SOCKLOG("%s\n", "Listening");
     }
 
     if (sock->client < 1)
@@ -163,7 +168,7 @@ ipcError socket_connect(Socket* sock)
 #endif
 
   SOCKLOG("Successfully connected socket with\n\tname: %s\n\tserver: "
-          "%lld\n\tclient: %lld\n",
+          "%" PRId64 "\n\tclient: %" PRId64 "\n",
           sock->name, (int64_t)sock->server, (int64_t)sock->client);
 
   sock->state.flags |= SocketConnected;
