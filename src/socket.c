@@ -180,6 +180,12 @@ static ipcError _socket_transact(Socket* sock, void* buffer, size_t bytes,
                                  int is_write)
 {
   ipcError err = 0;
+  if (!socket_is_connected(sock))
+  {
+    err = ipcErrorSocketConnect;
+    goto end;
+  }
+
   SocketHandle handle =
       (sock->flags & SocketServer) ? sock->client : sock->server;
 
@@ -220,6 +226,8 @@ static ipcError _socket_transact(Socket* sock, void* buffer, size_t bytes,
     err = errno | ipcErrorIsErrno;
 
 #endif
+
+end:
 
   if (err != ipcErrorSocketHasMoreData)
   {
@@ -264,21 +272,21 @@ bool socket_is_connected(Socket *sock)
     return false;
   SocketHandle handle = (sock->flags & SocketServer) ? sock->client : sock->server;
 #ifdef _WIN32
-  ReadFile(handle, NULL, 0, NULL, NULL);
+  ReadFileEx(handle, NULL, 0, &sock->state.overlap, NULL);
   switch (GetLastError())
   {
   case ERROR_PIPE_NOT_CONNECTED:
   case ERROR_BROKEN_PIPE:
   case ERROR_NO_DATA:
-    return false;
+    sock->state.flags &= ~SocketConnected;
   }
 #else
   int error = 0;
   socklen_t len = sizeof(error);
   int rv = getsockopt (handle, SOL_SOCKET, SO_ERROR, &error, &len);
   if (rv || error)
-    return false;
+    sock->state.flags &= ~SocketConnected;
 #endif
 
-  return true;
+  return sock->state.flags & SocketConnected;
 }
