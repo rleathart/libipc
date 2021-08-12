@@ -190,12 +190,12 @@ static ipcError _socket_transact(Socket* sock, void* buffer, size_t bytes,
       (sock->flags & SocketServer) ? sock->client : sock->server;
 
   size_t* bytes_out =
-      is_write ? &(sock->state.bytes_written) : &(sock->state.bytes_written);
+      is_write ? &(sock->state.bytes_written) : &(sock->state.bytes_read);
 
 #ifdef _WIN32
 
   OVERLAPPED* overlap =
-      is_write ? &(sock->state.overlap_write) : &(sock->state.overlap_write);
+      is_write ? &(sock->state.overlap_write) : &(sock->state.overlap_read);
   if (!(sock->state.flags & (is_write ? SocketWriting : SocketReading)))
   {
     if (is_write)
