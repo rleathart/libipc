@@ -3,6 +3,13 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+/*
+   socket_connect
+      Only fail if timeout expires
+   socket_*_bytes
+      Only fail if the socket is not connected
+*/
+
 // All named pipes on windows must start with this.
 static char* win32_pipe_prefix = "\\\\.\\pipe\\";
 
@@ -57,7 +64,7 @@ ipcError socket_connect(Socket* sock, int timeout)
 {
   ipcError err = ipcErrorNone;
 
-  if (sock->flags & SocketServer)
+  if (sock->flags & SocketServer) // Server accepting client connection
   {
     sock->server = sock->client =
         CreateNamedPipeA(sock->name, PIPE_ACCESS_DUPLEX,
@@ -72,7 +79,7 @@ ipcError socket_connect(Socket* sock, int timeout)
     if (!success && !err)
       err = GetLastError() | ipcErrorIsWin32;
   }
-  else
+  else // Client connecting to server
   {
     SYSTEMTIME st;
     GetSystemTime(&st);

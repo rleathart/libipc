@@ -4,6 +4,7 @@ typedef enum
 {
   ipcErrorNone,
   ipcErrorTimeout,
+  ipcErrorIOPending,
   ipcErrorSocketOpen,
   ipcErrorSocketConnect,
   ipcErrorSocketCreate,
