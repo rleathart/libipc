@@ -3,6 +3,7 @@
 typedef enum
 {
   ipcErrorNone,
+  ipcErrorTimeout,
   ipcErrorSocketOpen,
   ipcErrorSocketConnect,
   ipcErrorSocketCreate,

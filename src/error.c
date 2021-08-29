@@ -38,6 +38,8 @@ char* ipcError_str(ipcError e)
     return "No error";
   case ipcErrorUnknown:
     return "Unknown error";
+  case ipcErrorTimeout:
+    return "Opertaion timed out";
   case ipcErrorSocketOpen:
     return "Could not open socket";
   case ipcErrorSocketConnect:

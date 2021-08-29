@@ -56,7 +56,7 @@ typedef struct
 } Socket;
 
 void socket_init(Socket* sock, char* name, SocketFlags flags);
-ipcError socket_connect(Socket* sock);
+ipcError socket_connect(Socket* sock, int timeout);
 ipcError socket_disconnect(Socket* sock);
 ipcError socket_destroy(Socket* sock);
 ipcError socket_write_bytes(Socket* sock, void* buffer, size_t bytes_to_write);

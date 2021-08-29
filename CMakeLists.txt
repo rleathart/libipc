@@ -5,9 +5,8 @@ if (WIN32)
     _CRT_SECURE_NO_WARNINGS
     _CRT_NONSTDC_NO_DEPRECATE
     )
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS YES CACHE BOOL "Export all symbols")
 endif()
-
-project(ipc C)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "" FORCE)
@@ -17,12 +16,15 @@ if(CMAKE_BUILD_TYPE MATCHES Debug)
   add_compile_definitions(_DEBUG=1 DEBUG=1)
 endif()
 
-set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS YES CACHE BOOL "Export all symbols")
+# Just dump everything in the build dir so the executables can find dlls
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_library(${PROJECT_NAME}
-  src/socket.c
-  src/error.c
-  )
+project(ipc C)
+
+add_subdirectory(src)
+
 target_include_directories(${PROJECT_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
@@ -37,14 +39,7 @@ install(DIRECTORY include/ DESTINATION include)
 install(EXPORT ${PROJECT_NAME}Config DESTINATION lib/cmake/${PROJECT_NAME})
 export(TARGETS ${PROJECT_NAME} FILE ${PROJECT_NAME}Config.cmake)
 
-if(IPC_BUILD_TESTS)
-  include(CTest)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(CHECK REQUIRED check)
-
-  include_directories(include ${CHECK_INCLUDE_DIRS})
-  link_directories(${CHECK_LIBRARY_DIRS})
-  add_executable(test_socket test/socket.c)
-  target_link_libraries(test_socket ${PROJECT_NAME} ${CHECK_LIBRARIES})
-  add_test(NAME socket COMMAND test_socket)
+if(BUILD_TESTING AND NOT IPC_BUILD_TESTS EQUAL 0)
+  enable_testing()
+  add_subdirectory(test)
 endif()
