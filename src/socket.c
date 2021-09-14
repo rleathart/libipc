@@ -224,12 +224,12 @@ static ipcError _socket_transact(Socket* sock, void* buffer, size_t bytes,
   return err;
 }
 
-ipcError socket_write_bytes(Socket* sock, void* buffer, size_t bytes_to_write)
+ipcError socket_write(Socket* sock, void* buffer, size_t bytes_to_write)
 {
   return _socket_transact(sock, buffer, bytes_to_write, 1);
 }
 
-ipcError socket_read_bytes(Socket* sock, void* buffer, size_t bytes_to_read)
+ipcError socket_read(Socket* sock, void* buffer, size_t bytes_to_read)
 {
   return _socket_transact(sock, buffer, bytes_to_read, 0);
 }

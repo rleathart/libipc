@@ -4,18 +4,19 @@
 #include <stdlib.h>
 
 #if _WIN32
-char* test_socket_name = "\\\\.\\pipe\\test_socket.sock";
+/* char* test_socket_name = "\\\\.\\pipe\\test_socket.sock"; */
 
 #include <Windows.h>
 typedef HANDLE thread_t;
 typedef unsigned long thread_rv_t;
 #else
-char* test_socket_name = "test_socket.sock";
+/* char* test_socket_name = "test_socket.sock"; */
 
 typedef pthread_t thread_t;
 typedef void* thread_rv_t;
 #endif
 
+char* test_socket_name = "test_socket.sock";
 typedef thread_rv_t (*thread_fn_t)(void*);
 
 inline void create_thread(thread_t* thread, thread_fn_t fn, void* args)
@@ -38,7 +39,7 @@ inline void join_thread(thread_t thread, void* return_value)
 #endif
 }
 
-#define ipcLog(err) fprintf(stderr, "%s:%d %s\n", __FILE__, __LINE__, ipcError_str(err))
+#define ipcLog(err) {fprintf(stderr, "%s:%d (%d) %s\n", __FILE__, __LINE__, ipcError_int(err), ipcError_str(err)); abort();}
 
 inline void _Assert(char* file, int line)
 {

@@ -1,6 +1,11 @@
+#pragma comment(lib, "Ws2_32.lib")
+#include <WinSock2.h>
+#include <afunix.h>
+
 #include <assert.h>
 #include <ipc/socket.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 
 /*
@@ -10,52 +15,53 @@
       Only fail if the socket is not connected
 */
 
-// All named pipes on windows must start with this.
-static char* win32_pipe_prefix = "\\\\.\\pipe\\";
+static bool did_winsock_setup;
+static WSADATA wsaData;
 
 void socket_init(Socket* sock, char* name, SocketFlags flags)
 {
-  memset(sock, 0, sizeof(*sock));
+  if (!did_winsock_setup)
+    WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-  assert(strncmp(name, win32_pipe_prefix, strlen(win32_pipe_prefix)) == 0);
+  memset(sock, 0, sizeof(*sock));
 
   sock->name = strdup(name);
   sock->flags = flags;
 
-  sock->state.overlap.hEvent = CreateEvent(0, TRUE, TRUE, 0);
-  sock->state.overlap_read.hEvent = CreateEvent(0, TRUE, TRUE, 0);
-  sock->state.overlap_write.hEvent = CreateEvent(0, TRUE, TRUE, 0);
+  sock->server = sock->client = INVALID_SOCKET;
 }
 
-ipcError socket_read_bytes(Socket* sock, void* buffer, size_t bytes_to_read)
+ipcError socket_read(Socket* sock, void* buffer, size_t bytes_to_read)
 {
   ipcError err = ipcErrorNone;
 
   SocketHandle handle =
-      (sock->flags & SocketServer) ? sock->server : sock->client;
+      (sock->flags & SocketServer) ? sock->client : sock->server;
 
-  DWORD bytes_read = 0;
-  BOOL success = ReadFile(handle, buffer, bytes_to_read, &bytes_read, NULL);
+  int bytes_read = 0;
+  while (bytes_read < bytes_to_read)
+  {
+    int rv = recv(handle, buffer, bytes_to_read - bytes_read, 0);
 
-  if (!success && !err)
-    err = GetLastError() | ipcErrorIsWin32;
+    if (rv == SOCKET_ERROR && !err)
+      err = WSAGetLastError() | ipcErrorIsWin32;
 
+    bytes_read += rv;
+  }
   return err;
 }
 
-ipcError socket_write_bytes(Socket* sock, void* buffer, size_t bytes_to_write)
+ipcError socket_write(Socket* sock, void* buffer, size_t bytes_to_write)
 {
   ipcError err = ipcErrorNone;
 
   SocketHandle handle =
-      (sock->flags & SocketServer) ? sock->server : sock->client;
+      (sock->flags & SocketServer) ? sock->client : sock->server;
 
-  DWORD bytes_written = 0;
-  BOOL success =
-      WriteFile(handle, buffer, bytes_to_write, &bytes_written, NULL);
+  int rv = send(handle, buffer, bytes_to_write, 0);
 
-  if (!success && !err)
-    err = GetLastError() | ipcErrorIsWin32;
+  if (rv < 0 && !err)
+    err = WSAGetLastError() | ipcErrorIsWin32;
 
   return err;
 }
@@ -64,52 +70,57 @@ ipcError socket_connect(Socket* sock, int timeout)
 {
   ipcError err = ipcErrorNone;
 
-  if (sock->flags & SocketServer) // Server accepting client connection
+  struct sockaddr_un sock_name = {.sun_family = AF_UNIX};
+  strncpy(sock_name.sun_path, sock->name, sizeof(sock_name.sun_path));
+
+  if (sock->flags & SocketServer)
   {
-    sock->server = sock->client =
-        CreateNamedPipeA(sock->name, PIPE_ACCESS_DUPLEX,
-                         PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
-                         PIPE_UNLIMITED_INSTANCES, 512, 512, 0, NULL);
+    sock->server = socket(AF_UNIX, SOCK_STREAM, 0);
+    unlink(sock->name);
+    int bind_err =
+        bind(sock->server, (struct sockaddr*)&sock_name, sizeof(sock_name));
+    listen(sock->server, 10);
 
-    if (sock->server == INVALID_HANDLE_VALUE && !err)
-      err = GetLastError() | ipcErrorIsWin32;
+    fd_set rfds;
+    FD_ZERO(&rfds);
+    FD_SET(sock->server, &rfds);
 
-    BOOL success = ConnectNamedPipe(sock->server, NULL);
+    struct timeval tv = {
+        .tv_sec = 0,
+        .tv_usec = 1000 * timeout,
+    };
 
-    if (!success && !err)
-      err = GetLastError() | ipcErrorIsWin32;
+    int sockets_ready = select(sock->server + 1, &rfds, &rfds, 0, &tv);
+
+    if (sockets_ready > 0)
+      sock->client = accept(sock->server, NULL, NULL);
+    else if (!err)
+      err = ipcErrorTimeout;
   }
-  else // Client connecting to server
+  else
   {
+    sock->server = socket(sock_name.sun_family, SOCK_STREAM, 0);
+
     SYSTEMTIME st;
     GetSystemTime(&st);
-
     int start_seconds = st.wSecond;
     int start_ms = st.wMilliseconds;
 
-    int time_elapsed = 0; // ms
-    BOOL success = false;
+    int connect_err = 1;
+    int elapsed_time = 0; // ms
 
-    while (time_elapsed < timeout)
+    while (elapsed_time < timeout && connect_err)
     {
-      success = WaitNamedPipeA(sock->name, timeout);
+      connect_err = connect(sock->server, (struct sockaddr*)&sock_name,
+                                sizeof(sock_name));
+
       GetSystemTime(&st);
-      time_elapsed +=
+      elapsed_time +=
           (st.wSecond - start_seconds) * 1000 + st.wMilliseconds - start_ms;
     }
 
-    if (time_elapsed > timeout && !success && !err)
+    if (connect_err)
       err = ipcErrorTimeout;
-
-    if (!success && !err)
-      err = GetLastError() | ipcErrorIsWin32;
-
-    sock->server = sock->client =
-        CreateFileA(sock->name, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE,
-                    NULL, OPEN_EXISTING, 0, NULL);
-
-    if (sock->server == INVALID_HANDLE_VALUE && !err)
-      err = GetLastError() | ipcErrorIsWin32;
   }
 
   return err;

@@ -2,28 +2,32 @@
 
 #include "util.h"
 
-char* payload = "Hello, World!";
-char buffer[512] = {};
+char payload[] = "Hello, World!";
+
+enum
+{
+  ConnectTimeout = 100,
+};
 
 thread_rv_t server()
 {
-  Sleep(1000);
+  char buffer[512] = {};
   ipcError err = 0;
 
   Socket sock;
   socket_init(&sock, test_socket_name, SocketServer);
 
-  err = socket_connect(&sock, 200);
+  err = socket_connect(&sock, ConnectTimeout);
 
   if (err)
     ipcLog(err);
 
-  err = socket_write_bytes(&sock, payload, strlen(payload) + 1);
+  err = socket_write(&sock, payload, sizeof(payload));
 
   if (err)
     ipcLog(err);
 
-  err = socket_read_bytes(&sock, buffer, sizeof(buffer));
+  err = socket_read(&sock, buffer, sizeof(payload));
 
   if (err)
     ipcLog(err);
@@ -35,17 +39,18 @@ thread_rv_t server()
 
 thread_rv_t client()
 {
+  char buffer[512] = {};
   ipcError err = 0;
 
   Socket sock;
   socket_init(&sock, test_socket_name, 0);
 
-  err = socket_connect(&sock, 200);
+  err = socket_connect(&sock, ConnectTimeout);
 
   if (err)
     ipcLog(err);
 
-  err = socket_read_bytes(&sock, buffer, sizeof(buffer));
+  err = socket_read(&sock, buffer, sizeof(payload));
 
   if (err)
     ipcLog(err);
@@ -54,7 +59,7 @@ thread_rv_t client()
 
   memset(buffer, 0, sizeof(buffer));
 
-  err = socket_write_bytes(&sock, payload, strlen(payload) + 1);
+  err = socket_write(&sock, payload, sizeof(payload));
 
   if (err)
     ipcLog(err);
@@ -74,5 +79,6 @@ int main(int argc, char** argv)
   for (int i = 0; i < 2; i++)
     join_thread(threads[i], &err[i]);
 
+  unlink(test_socket_name);
   return err[0] || err[1];
 }

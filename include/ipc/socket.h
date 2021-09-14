@@ -29,11 +29,6 @@ typedef struct
   SocketStateFlags flags;
   size_t bytes_read;    // Bytes read in this IO transaction
   size_t bytes_written; // Bytes written in this IO transaction
-#ifdef _WIN32
-  OVERLAPPED overlap;
-  OVERLAPPED overlap_read;
-  OVERLAPPED overlap_write;
-#endif
 } SocketState;
 
 // Socket should provide
@@ -41,7 +36,7 @@ typedef struct
 //  - Bidirectional one to one transport
 
 #ifdef _WIN32
-typedef HANDLE SocketHandle;
+typedef SOCKET SocketHandle;
 #else
 typedef int SocketHandle;
 #endif
@@ -59,6 +54,6 @@ void socket_init(Socket* sock, char* name, SocketFlags flags);
 ipcError socket_connect(Socket* sock, int timeout);
 ipcError socket_disconnect(Socket* sock);
 ipcError socket_destroy(Socket* sock);
-ipcError socket_write_bytes(Socket* sock, void* buffer, size_t bytes_to_write);
-ipcError socket_read_bytes(Socket* sock, void* buffer, size_t bytes_to_read);
+ipcError socket_write(Socket* sock, void* buffer, size_t bytes_to_write);
+ipcError socket_read(Socket* sock, void* buffer, size_t bytes_to_read);
 bool socket_is_connected(Socket* sock);
