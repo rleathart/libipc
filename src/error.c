@@ -39,7 +39,7 @@ char* ipcError_str(ipcError e)
   case ipcErrorUnknown:
     return "Unknown error";
   case ipcErrorTimeout:
-    return "Opertaion timed out";
+    return "Operation timed out";
   case ipcErrorIOPending:
     return "IO operation is pending";
   case ipcErrorSocketOpen:
