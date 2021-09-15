@@ -1,4 +1,9 @@
 #include <ipc/socket.h>
+#include <string.h>
+
+#if !_WIN32
+#include <unistd.h>
+#endif
 
 #include "util.h"
 
@@ -34,7 +39,7 @@ thread_rv_t server()
 
   Assert(strcmp(payload, buffer) == 0);
 
-  return err;
+  return (thread_rv_t)err;
 }
 
 thread_rv_t client()
@@ -64,7 +69,7 @@ thread_rv_t client()
   if (err)
     ipcLog(err);
 
-  return err;
+  return (thread_rv_t)err;
 }
 
 int main(int argc, char** argv)

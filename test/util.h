@@ -11,6 +11,7 @@ typedef HANDLE thread_t;
 typedef unsigned long thread_rv_t;
 #else
 /* char* test_socket_name = "test_socket.sock"; */
+#include <pthread.h>
 
 typedef pthread_t thread_t;
 typedef void* thread_rv_t;
@@ -19,7 +20,7 @@ typedef void* thread_rv_t;
 char* test_socket_name = "test_socket.sock";
 typedef thread_rv_t (*thread_fn_t)(void*);
 
-inline void create_thread(thread_t* thread, thread_fn_t fn, void* args)
+void create_thread(thread_t* thread, thread_fn_t fn, void* args)
 {
 #if _WIN32
   *thread = CreateThread(0, 0, fn, args, 0, 0);
@@ -28,7 +29,7 @@ inline void create_thread(thread_t* thread, thread_fn_t fn, void* args)
 #endif
 }
 
-inline void join_thread(thread_t thread, void* return_value)
+void join_thread(thread_t thread, void* return_value)
 {
 #if _WIN32
   WaitForSingleObject(thread, INFINITE);
@@ -41,7 +42,7 @@ inline void join_thread(thread_t thread, void* return_value)
 
 #define ipcLog(err) {fprintf(stderr, "%s:%d (%d) %s\n", __FILE__, __LINE__, ipcError_int(err), ipcError_str(err)); abort();}
 
-inline void _Assert(char* file, int line)
+void _Assert(char* file, int line)
 {
   fprintf(stderr, "Assertion failed: %s:%d\n", file, line);          
   abort();

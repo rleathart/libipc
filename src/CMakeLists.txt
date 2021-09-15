@@ -1,5 +1,5 @@
-if(WIN32)
-  add_subdirectory(win32)
-else()
-  add_subdirectory(unix)
-endif()
+add_library(${PROJECT_NAME}
+  socket.c
+  error.c
+  platform.c
+  )

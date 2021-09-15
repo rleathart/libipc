@@ -4,10 +4,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
-
 typedef enum
 {
   SocketNoFlags = 0,
@@ -35,11 +31,7 @@ typedef struct
 //  - Local IPC
 //  - Bidirectional one to one transport
 
-#ifdef _WIN32
-typedef SOCKET SocketHandle;
-#else
 typedef int SocketHandle;
-#endif
 
 typedef struct
 {
