@@ -9,4 +9,4 @@
 #define SOCKET_ERROR -1
 
 // Win32 uses WSAGetLastError()
-#define socket_last_error() errno
+#define socket_last_error() (errno | ipcErrorIsErrno)

@@ -44,7 +44,7 @@ ipcError socket_read(Socket* sock, void* buffer, size_t bytes_to_read)
     int rv = recv(handle, buffer, bytes_to_read - bytes_read, 0);
 
     if (rv == SOCKET_ERROR && !err)
-      err = socket_last_error() | ipcErrorIsWin32;
+      err = socket_last_error();
 
     bytes_read += rv;
   }
@@ -61,7 +61,7 @@ ipcError socket_write(Socket* sock, void* buffer, size_t bytes_to_write)
   int rv = send(handle, buffer, bytes_to_write, 0);
 
   if (rv < 0 && !err)
-    err = socket_last_error() | ipcErrorIsWin32;
+    err = socket_last_error();
 
   return err;
 }
