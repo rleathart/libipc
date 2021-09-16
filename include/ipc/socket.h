@@ -3,6 +3,7 @@
 #include <ipc/error.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef enum
 {
@@ -31,7 +32,7 @@ typedef struct
 //  - Local IPC
 //  - Bidirectional one to one transport
 
-typedef int SocketHandle;
+typedef int64_t SocketHandle;
 
 typedef struct
 {

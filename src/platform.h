@@ -10,10 +10,11 @@ typedef struct
 {
   size_t sec;
   size_t usec;
-} ipcTimeOfDay;
+} ipcTime;
 
 // Does platform specific setup (e.g. WSAStartup)
 void socket_platform_init(void);
 
-// Populates an ipcTimeOfDay structure with the current UTC time (usec pres.)
-void ipc_get_utc_time(ipcTimeOfDay*);
+// Populates an ipcTime structure with the number of seconds + microseconds
+// since unix epoch (UTC).
+void ipc_get_utc_time(ipcTime*);

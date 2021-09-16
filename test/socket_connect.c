@@ -76,8 +76,9 @@ int main(int argc, char** argv)
 {
   unlink(test_socket_name);
   thread_t threads[2];
-  create_thread(&threads[0], server, 0);
   create_thread(&threads[1], client, 0);
+  Sleep(20);
+  create_thread(&threads[0], server, 0);
 
   unsigned long err[2];
 

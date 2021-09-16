@@ -73,6 +73,11 @@ ipcError socket_connect(Socket* sock, int timeout)
   struct sockaddr_un sock_name = {.sun_family = AF_UNIX};
   strncpy(sock_name.sun_path, sock->name, sizeof(sock_name.sun_path));
 
+  struct timeval tv = {
+    .tv_sec = 0,
+    .tv_usec = 1000 * timeout,
+  };
+
   if (sock->flags & SocketServer)
   {
     sock->server = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -81,16 +86,11 @@ ipcError socket_connect(Socket* sock, int timeout)
         bind(sock->server, (struct sockaddr*)&sock_name, sizeof(sock_name));
     listen(sock->server, 10);
 
-    fd_set rfds;
-    FD_ZERO(&rfds);
-    FD_SET(sock->server, &rfds);
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(sock->server, &fds);
 
-    struct timeval tv = {
-        .tv_sec = 0,
-        .tv_usec = 1000 * timeout,
-    };
-
-    int sockets_ready = select(sock->server + 1, &rfds, &rfds, 0, &tv);
+    int sockets_ready = select(sock->server + 1, &fds, 0, 0, &tv);
 
     if (sockets_ready > 0)
       sock->client = accept(sock->server, NULL, NULL);
@@ -101,7 +101,7 @@ ipcError socket_connect(Socket* sock, int timeout)
   {
     sock->server = socket(sock_name.sun_family, SOCK_STREAM, 0);
 
-    ipcTimeOfDay st;
+    ipcTime st;
     ipc_get_utc_time(&st);
     int start_seconds = st.sec;
     int start_ms = st.usec / 1000;
@@ -115,7 +115,7 @@ ipcError socket_connect(Socket* sock, int timeout)
                             sizeof(sock_name));
 
       ipc_get_utc_time(&st);
-      elapsed_time += (st.sec - start_seconds) * 1000 +
+      elapsed_time = (st.sec - start_seconds) * 1000 +
                       (st.usec / 1000) - start_ms;
     }
 
