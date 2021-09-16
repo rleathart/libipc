@@ -3,6 +3,16 @@
 
 #if !_WIN32
 #include <unistd.h>
+
+void Sleep(int ms)
+{
+  struct timeval tv = {
+    .tv_sec = ms / 1000,
+    .tv_usec = (ms % 1000) * 1000,
+  };
+
+  select(0, 0, 0, 0, &tv);
+}
 #endif
 
 #include "util.h"

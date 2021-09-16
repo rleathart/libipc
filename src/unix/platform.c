@@ -4,7 +4,7 @@ void socket_platform_init(void)
 {
 }
 
-void ipc_get_utc_time(ipcTimeOfDay* time)
+void ipc_get_utc_time(ipcTime* time)
 {
   struct timeval tv;
   gettimeofday(&tv, NULL);
