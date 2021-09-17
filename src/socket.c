@@ -74,8 +74,8 @@ ipcError socket_connect(Socket* sock, int timeout)
   strncpy(sock_name.sun_path, sock->name, sizeof(sock_name.sun_path));
 
   struct timeval tv = {
-      .tv_sec = 0,
-      .tv_usec = 1000 * timeout,
+      .tv_sec = timeout / 1000,
+      .tv_usec = 1000 * (timeout % 1000),
   };
 
   if (sock->flags & SocketServer)
