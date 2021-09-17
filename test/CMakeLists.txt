@@ -9,4 +9,5 @@ endfunction()
 add_tests(
   socket_init.c
   socket_connect.c
+  socket_is_connected.c
   )

@@ -74,8 +74,8 @@ ipcError socket_connect(Socket* sock, int timeout)
   strncpy(sock_name.sun_path, sock->name, sizeof(sock_name.sun_path));
 
   struct timeval tv = {
-    .tv_sec = 0,
-    .tv_usec = 1000 * timeout,
+      .tv_sec = 0,
+      .tv_usec = 1000 * timeout,
   };
 
   if (sock->flags & SocketServer)
@@ -115,8 +115,8 @@ ipcError socket_connect(Socket* sock, int timeout)
                             sizeof(sock_name));
 
       ipc_get_utc_time(&st);
-      elapsed_time = (st.sec - start_seconds) * 1000 +
-                      (st.usec / 1000) - start_ms;
+      elapsed_time =
+          (st.sec - start_seconds) * 1000 + (st.usec / 1000) - start_ms;
     }
 
     if (connect_err)
@@ -124,4 +124,21 @@ ipcError socket_connect(Socket* sock, int timeout)
   }
 
   return err;
+}
+
+bool socket_is_connected(Socket* sock)
+{
+  fd_set set;
+  FD_ZERO(&set);
+  SocketHandle handle =
+      (sock->flags & SocketServer) ? sock->client : sock->server;
+
+  FD_SET(handle, &set);
+
+  struct timeval tv = {};
+
+  if (select(handle + 1, &set, &set, 0, &tv) > 0)
+    return true;
+
+  return false;
 }
